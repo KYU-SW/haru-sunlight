@@ -78,16 +78,23 @@ var KmaProvider = (function () {
     });
   }
 
+  /* 호출 경로 — 로컬 키가 있으면 기상청 직접, 없으면 중계 서버(키는 서버에만 있음)
+     src = { fcst: 기본 URL, uv: 기본 URL, auth: '?serviceKey=…&' | '?' } */
+  function source(key, proxy) {
+    if (key) return { fcst: FCST_URL, uv: UV_URL, auth: '?serviceKey=' + encKey(key) + '&', via: 'direct' };
+    var base = String(proxy).replace(/\/+$/, '');
+    return { fcst: base + '/fcst', uv: base + '/uv', auth: '?', via: 'proxy' };
+  }
+
   /* ---------- 단기예보: 기온(TMP) · 습도(REH) ---------- */
-  function fetchForecast(key, nx, ny, now) {
+  function fetchForecast(src, nx, ny, now) {
     var bases = recentBases(now, FCST_BASE_HOURS, 2);
 
     function attempt(i) {
       if (i >= bases.length) return Promise.reject(new Error('단기예보 발표 자료를 찾지 못했습니다'));
       var b = bases[i];
-      var url = FCST_URL +
-        '?serviceKey=' + encKey(key) +
-        '&pageNo=1&numOfRows=1000&dataType=JSON' +
+      var url = src.fcst + src.auth +
+        'pageNo=1&numOfRows=1000&dataType=JSON' +
         '&base_date=' + ymd(b) + '&base_time=' + p2(b.getHours()) + '00' +
         '&nx=' + nx + '&ny=' + ny;
 
@@ -119,15 +126,14 @@ var KmaProvider = (function () {
   }
 
   /* ---------- 생활기상지수: 자외선지수 ---------- */
-  function fetchUv(key, areaNo, now) {
+  function fetchUv(src, areaNo, now) {
     var bases = recentBases(now, UV_BASE_HOURS, 3);
 
     function attempt(i) {
       if (i >= bases.length) return Promise.reject(new Error('자외선지수 발표 자료를 찾지 못했습니다'));
       var b = bases[i];
-      var url = UV_URL +
-        '?serviceKey=' + encKey(key) +
-        '&pageNo=1&numOfRows=10&dataType=JSON' +
+      var url = src.uv + src.auth +
+        'pageNo=1&numOfRows=10&dataType=JSON' +
         '&areaNo=' + areaNo +
         '&time=' + ymd(b) + p2(b.getHours());
 
@@ -209,8 +215,8 @@ var KmaProvider = (function () {
   }
 
   /* ---------- 공개 API ---------- */
-  function load(loc, key) {
-    if (!key) {
+  function load(loc, key, proxy) {
+    if (!key && !proxy) {
       var e0 = new Error('기상청 서비스키가 없습니다 — config.local.js에 넣어 주세요');
       e0.noKey = true;
       return Promise.reject(e0);
@@ -223,10 +229,11 @@ var KmaProvider = (function () {
     var nearest = KmaGeo.nearestCity(loc.lat, loc.lon);
     var grid = (loc.nx && loc.ny) ? { nx: loc.nx, ny: loc.ny } : KmaGeo.toGrid(loc.lat, loc.lon);
     var areaNo = loc.areaNo || nearest.areaNo;
+    var src = source(key, proxy);
 
     return Promise.all([
-      fetchForecast(key, grid.nx, grid.ny, now).then(parseForecast),
-      fetchUv(key, areaNo, now).then(parseUv)
+      fetchForecast(src, grid.nx, grid.ny, now).then(parseForecast),
+      fetchUv(src, areaNo, now).then(parseUv)
         .catch(function (e) { return { error: e }; })     // UV만 실패해도 날씨는 살린다
     ]).then(function (r) {
       var fcstDays = r[0];
@@ -237,6 +244,7 @@ var KmaProvider = (function () {
 
       return {
         source: 'kma',
+        via: src.via,
         sourceLabel: '기상청 단기예보 · 생활기상지수',
         fetchedAt: Date.now(),
         dateKey: Engine.dayKey(now),
@@ -254,6 +262,6 @@ var KmaProvider = (function () {
   return {
     FCST_URL: FCST_URL, UV_URL: UV_URL, load: load,
     _: { recentBases: recentBases, parseForecast: parseForecast, parseUv: parseUv,
-         uvAt: uvAt, merge: merge, encKey: encKey, unwrap: unwrap }
+         uvAt: uvAt, merge: merge, encKey: encKey, unwrap: unwrap, source: source }
   };
 })();

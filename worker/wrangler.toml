@@ -1,0 +1,5 @@
+# 기상청 API 중계 서버 배포 설정 — 서비스키는 여기 넣지 않는다.
+# 키는 `npx wrangler secret put KMA_SERVICE_KEY` 로 Cloudflare 비밀값에만 저장한다.
+name = "haru-sunlight-kma"
+main = "kma-proxy.js"
+compatibility_date = "2025-01-01"

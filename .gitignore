@@ -4,3 +4,8 @@ config.local.js
 # OS · 에디터 잡파일
 .DS_Store
 Thumbs.db
+
+# Cloudflare 배포 도구 임시 폴더
+.wrangler/
+node_modules/
+.dev.vars

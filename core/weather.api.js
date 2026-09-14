@@ -7,6 +7,7 @@
    ⚠️ 서비스키는 앱 기능(설정 화면 입력)이 아니라 config.local.js 파일로만 넣는다.
       그 파일은 .gitignore에 등록돼 있어 깃허브에 올라가지 않는다.
       키가 있는 사람만 config.local.example.js를 복사해 채워 넣고 테스트한다.
+   ⚠️ 키가 없으면 config.js의 KMA_PROXY_URL(중계 서버)로 받는다 — 공개 링크용.
       → README "서비스키 설정" 참고.
    ========================================================= */
 var WeatherAPI = (function () {
@@ -14,9 +15,12 @@ var WeatherAPI = (function () {
   var CITIES = KmaGeo.CITIES;
 
   function key() { return (window.KMA_SERVICE_KEY || '').trim(); }
+  /* 중계 서버 주소(config.js) — 공개 링크용. 키는 그 서버에만 있다 */
+  function proxy() { return (window.KMA_PROXY_URL || '').trim(); }
   function nearestCity(lat, lon) { return KmaGeo.nearestCity(lat, lon).name; }
   function todayKey() { return Engine.dayKey(new Date()); }
   function hasKey() { return !!key(); }
+  function hasProxy() { return !!proxy(); }
   function inKorea(lat, lon) { return KmaGeo.inKorea(lat, lon); }
 
   /* 브라우저 위치정보 — 국내 좌표가 아니면 명시적으로 거부한다.
@@ -61,7 +65,7 @@ var WeatherAPI = (function () {
       return Promise.resolve({ data: cache, stale: false, cached: true });
     }
 
-    return KmaProvider.load(loc, key())
+    return KmaProvider.load(loc, key(), proxy())
       .then(function (data) {
         Repo.setWeatherCache(data);
         return { data: data, stale: false, cached: false };
@@ -75,6 +79,6 @@ var WeatherAPI = (function () {
   return {
     CITIES: CITIES, GROUPS: KmaGeo.GROUPS, nearestCity: nearestCity,
     locate: locate, load: load, todayKey: todayKey,
-    hasKey: hasKey, inKorea: inKorea, TTL_MS: TTL_MS
+    hasKey: hasKey, hasProxy: hasProxy, inKorea: inKorea, TTL_MS: TTL_MS
   };
 })();

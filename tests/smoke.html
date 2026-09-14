@@ -287,6 +287,19 @@ window.KMA_SERVICE_KEY = '  dummy-key  ';
 ok('키 있으면 hasKey() = true (앞뒤 공백은 무시)', WeatherAPI.hasKey() === true);
 ok('inKorea() 위임', WeatherAPI.inKorea(37.57, 126.98) === true && WeatherAPI.inKorea(28.61, 77.21) === false);
 
+/* 공개 링크용 중계 서버 경로 — 키가 없으면 KMA_PROXY_URL로, 키가 있으면 기상청 직접 */
+var sProxy = _.source('', 'https://proxy.example.dev/');
+ok('키 없으면 중계 서버 경로(/fcst · /uv)를 쓴다', sProxy.via === 'proxy' &&
+   sProxy.fcst === 'https://proxy.example.dev/fcst' && sProxy.uv === 'https://proxy.example.dev/uv');
+ok('중계 서버 요청 URL에는 serviceKey가 붙지 않는다', sProxy.auth === '?');
+var sDirect = _.source('a+b/c', 'https://proxy.example.dev');
+ok('로컬 키가 있으면 중계 서버보다 직접 호출이 우선', sDirect.via === 'direct' &&
+   sDirect.fcst === KmaProvider.FCST_URL && sDirect.auth === '?serviceKey=a%2Bb%2Fc&');
+window.KMA_PROXY_URL = ' https://proxy.example.dev ';
+ok('hasProxy() — config.js 주소 인식(앞뒤 공백 무시)', WeatherAPI.hasProxy() === true);
+window.KMA_PROXY_URL = '';
+ok('주소 없으면 hasProxy() = false', WeatherAPI.hasProxy() === false);
+
 window.KMA_SERVICE_KEY = '';
 var rejected = false, taggedNoKey = false;
 WeatherAPI.load(loc, true).catch(function (e) {
