@@ -40,7 +40,7 @@ var TimerService = (function () {
     var p = Prescription.pointAt(st.rx, nowM);
     var r = Engine.computePoint({
       uvi: p.uvi, tempC: p.tempC, rh: p.rh,
-      skinType: profile.skinType, clothing: profile.clothing, spf: profile.spf
+      skinType: profile.skinType, clothing: profile.clothing
     });
     r.altitude = p.altitude;
     r.minuteOfDay = nowM;

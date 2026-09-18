@@ -15,6 +15,19 @@ var App = (function () {
     error: null
   };
 
+  /* 헤더 구분선 — 평소엔 없고, 내용이 헤더 밑으로 들어가면(스크롤) 옅게 생긴다.
+     데스크톱 기기 틀에서는 #app이, 휴대폰에서는 창이 스크롤되므로 둘 다 듣는다. */
+  function syncScrolled() {
+    var app = document.getElementById('app');
+    var y = Math.max(app.scrollTop, window.scrollY || 0);
+    app.classList.toggle('is-scrolled', y > 4);
+  }
+  function watchScroll() {
+    document.getElementById('app').addEventListener('scroll', syncScrolled, { passive: true });
+    window.addEventListener('scroll', syncScrolled, { passive: true });
+    syncScrolled();
+  }
+
   /* ---------- 부트 ---------- */
   function init() {
     document.getElementById('sheet-bg').onclick = function (e) {
@@ -23,6 +36,7 @@ var App = (function () {
     [].forEach.call(document.querySelectorAll('.tab'), function (t) {
       t.onclick = function () { go(t.dataset.tab); };
     });
+    watchScroll();
 
     state.profile = Repo.getProfile();
     state.location = Repo.getLocation();
@@ -118,6 +132,7 @@ var App = (function () {
     if (tab !== 'timer') TimerView.stopLoop();
     scrollTop();
     refreshView();
+    syncScrolled();              // 탭을 바꾸면 맨 위라 선이 바로 사라진다(스크롤 이벤트는 한 박자 늦게 온다)
   }
 
   /* 데스크톱에서는 기기 틀 안의 #app이 스크롤되고, 휴대폰에서는 창이 스크롤된다.

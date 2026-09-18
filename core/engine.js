@@ -146,7 +146,7 @@ var Engine = (function () {
       var r = computePoint({
         uvi: p.uvi, uviClear: p.uviClear, tempC: p.tempC, rh: p.rh,
         feelsLike: p.feelsLike,
-        skinType: profile.skinType, clothing: profile.clothing, spf: profile.spf
+        skinType: profile.skinType, clothing: profile.clothing
       });
       r.minuteOfDay = p.minuteOfDay;
       r.altitude = sunAlt(p.minuteOfDay);
