@@ -44,6 +44,14 @@ jobs:
           open(p, 'w', encoding='utf-8').write(s)
           PY
 
+      # 깃허브 페이지는 파일을 10분 캐시한다(max-age=600). 올릴 때마다 CSS·JS 주소 뒤에
+      # 커밋 번호를 붙여, 새로고침하면 브라우저가 옛 파일 대신 새 파일을 받게 한다.
+      - name: 캐시 무효화 — CSS·JS 주소에 버전 붙이기
+        run: |
+          V="${GITHUB_SHA::7}"
+          sed -i -E "s#(href=\"css/[^\"?]+\.css)\"#\1?v=$V\"#g; s#(src=\"[^\"?:]+\.js)\"#\1?v=$V\"#g" index.html
+          echo "버전 $V 적용:"; grep -c "?v=$V" index.html
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
