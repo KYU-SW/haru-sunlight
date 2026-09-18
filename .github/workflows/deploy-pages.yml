@@ -1,0 +1,54 @@
+# 깃허브 페이지 배포 — main에 올라오면 자동으로 사이트를 갱신한다.
+# 기상청 서비스키는 저장소 코드에 넣지 않고, 저장소 비밀값(Settings → Secrets → Actions)의
+# KMA_SERVICE_KEY 를 배포하는 순간에만 config.js 에 채워 넣는다.
+name: Deploy Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 기상청 서비스키 채우기
+        env:
+          KMA_SERVICE_KEY: ${{ secrets.KMA_SERVICE_KEY }}
+        run: |
+          if [ -z "$KMA_SERVICE_KEY" ]; then
+            echo "::warning::KMA_SERVICE_KEY 비밀값이 없습니다 — 중계 서버 주소로 배포합니다"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import os
+          p = 'config.js'
+          s = open(p, encoding='utf-8').read()
+          old = "window.KMA_SERVICE_KEY = '';"
+          assert old in s, 'config.js 형식이 바뀌었습니다'
+          s = s.replace(old, "window.KMA_SERVICE_KEY = '%s';" % os.environ['KMA_SERVICE_KEY'].strip(), 1)
+          open(p, 'w', encoding='utf-8').write(s)
+          PY
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

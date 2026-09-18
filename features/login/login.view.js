@@ -23,7 +23,7 @@ var LoginView = (function () {
       '<div class="lg-in">' +
         '<div class="lg-top">' +
           '<div class="lg-icon">' + sunMark() + '</div>' +
-          '<h1 class="lg-title">하루 햇빛</h1>' +
+          '<h1 class="lg-title">하루<span>햇빛</span></h1>' +
           '<p class="lg-sub">오늘 언제 몇 분 쬐면 되는지<br>계산해서 알려드려요</p>' +
         '</div>' +
 
