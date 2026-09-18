@@ -137,7 +137,7 @@ var Prescription = (function () {
     var p = pointAt(rx, localNow(rx.tz).minute);
     return Engine.computePoint({
       uvi: p.uvi, tempC: p.tempC, rh: p.rh,
-      skinType: profile.skinType, clothing: profile.clothing, spf: profile.spf
+      skinType: profile.skinType, clothing: profile.clothing
     });
   }
 

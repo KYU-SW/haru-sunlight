@@ -1388,3 +1388,15 @@ html, body, #app, .phone,
   background:#EAF0FF; color:#326CF9; font-size:15px; font-weight:700; }
 #onboarding .st-res { max-height:none; }
 @media (prefers-reduced-motion: reduce) { .ob-body.enter { animation:none; } .ob-prog i { transition:none; } }
+
+/* =========================================================
+   헤더 — 모든 화면에서 위에 고정, 구분선은 스크롤할 때만 옅게
+   (토스·iOS처럼 평소엔 선이 없다. #app.is-scrolled 는 shared/app.js의 watchScroll)
+   ========================================================= */
+.ha-head, .an-head, .hdr {
+  position:sticky; top:0; z-index:30;
+  background:#fff; -webkit-backdrop-filter:none; backdrop-filter:none;
+  border-bottom:1px solid transparent; transition:border-color .2s ease;
+}
+.hdr { margin:0; }
+.is-scrolled .ha-head, .is-scrolled .an-head, .is-scrolled .hdr { border-bottom-color:var(--hair); }

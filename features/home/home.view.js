@@ -41,14 +41,16 @@ var HomeView = (function () {
     var d = m.rx.date;
     var dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
     var notifyOn = m.rx.profile.notify && Notify.granted();
-    return '<div class="ha-top">' +
+    return '<div class="ha-head">' +
+      '<div class="ha-top">' +
         '<div class="ha-logo">하루<span>햇빛</span></div>' +
         '<div class="ha-icons">' +
           '<button id="h-bell" aria-label="알림">' + UI.ICON.bell + (notifyOn ? '<i class="ha-dot"></i>' : '') + '</button>' +
           '<button id="h-refresh" aria-label="날씨 새로고침">' + UI.ICON.refresh + '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="ha-loc">' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + dow + '요일</div>';
+      '<div class="ha-loc">' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + dow + '요일</div>' +
+    '</div>';
   }
 
   /* ---------- 오늘의 한마디 — 날짜마다 하나씩 (같은 날엔 새로고침해도 그대로) ----------

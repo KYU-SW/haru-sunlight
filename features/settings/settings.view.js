@@ -3,23 +3,12 @@
 
    목록형으로 간략하게 연다.
      내 햇빛 기록(누르면 노출 이력 · 아래 줄은 이번 주 분석) → 내 정보 → 알림 · 리듬 → 위치
-   자주 안 바꾸는 값(피부 타입·옷차림·SPF, 지역)은 줄 하나로 두고 누르면 시트로 연다.
+   자주 안 바꾸는 값(피부 타입·옷차림, 지역)은 줄 하나로 두고 누르면 시트로 연다.
    계산식·계산 근거는 화면에 드러내지 않는다.
    ========================================================= */
 var SettingsView = (function () {
 
   var el;
-
-  var SPF = [
-    { v: 1,  label: '안 바름' },
-    { v: 15, label: 'SPF 15' },
-    { v: 30, label: 'SPF 30' },
-    { v: 50, label: 'SPF 50+' }
-  ];
-  function spfLabel(v) {
-    var o = SPF.filter(function (s) { return s.v === (v || 1); })[0];
-    return o ? o.label : 'SPF ' + v;
-  }
 
   function render() {
     var m = SettingsService.model(App.prescription());
@@ -35,8 +24,7 @@ var SettingsView = (function () {
 
         group('내 정보',
           navRow('s-body-skin', '피부 타입', '타입 ' + skin) +
-          navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '') +
-          navRow('s-body-spf', '선크림', spfLabel(p.spf))) +
+          navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '')) +
 
         group('알림',
           toggleRow('s-notify', '햇빛 알림', p.notify && m.notifyGranted)) +
@@ -86,7 +74,7 @@ var SettingsView = (function () {
       '<span class="sw' + (on ? ' on' : '') + '"></span></button>';
   }
 
-  /* ---------- 내 정보 시트 : 피부 타입 · 기본 옷차림 · 선크림 ----------
+  /* ---------- 내 정보 시트 : 피부 타입 · 기본 옷차림 ----------
      #sheet-body는 #screen-settings 밖에 있어 이 시트 전용 바인딩을 따로 건다. */
   function bodyInfoSheet() {
     var m = SettingsService.model(App.prescription());
@@ -113,16 +101,6 @@ var SettingsView = (function () {
               c.label + '</button>';
           }).join('') +
         '</div>' +
-      '</div>' +
-
-      '<div class="st-sh">' +
-        '<div class="st-sh-t">선크림</div>' +
-        '<div class="seg" id="s-spf">' +
-          SPF.map(function (s) {
-            return '<button data-spf="' + s.v + '"' + ((p.spf || 1) === s.v ? ' class="on"' : '') + '>' +
-              s.label + '</button>';
-          }).join('') +
-        '</div>' +
       '</div>';
 
     UI.sheet('내 정보', null, html);
@@ -144,7 +122,6 @@ var SettingsView = (function () {
     }
     hook('#s-skin button', function (b) { return { skinType: +b.dataset.t }; });
     hook('#s-cloth button', function (b) { return { clothing: b.dataset.c }; });
-    hook('#s-spf button', function (b) { return { spf: +b.dataset.spf }; });
   }
 
   /* ---------- 지역 시트 : 현재 위치 또는 검색 ----------
@@ -220,7 +197,7 @@ var SettingsView = (function () {
 
     q('s-history').onclick = function () { WeeklyView.open('log'); };
     q('s-analysis').onclick = function () { WeeklyView.open('analysis'); };
-    q('s-body-skin').onclick = q('s-body-cloth').onclick = q('s-body-spf').onclick =
+    q('s-body-skin').onclick = q('s-body-cloth').onclick =
       function () { bodyInfoSheet(); };
     q('s-region').onclick = function () { regionSheet(); };
 
