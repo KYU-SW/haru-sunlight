@@ -31,7 +31,8 @@ const PARAMS = {
 };
 
 const ALLOWED_ORIGINS = [
-  /^https:\/\/mnsjwn\.github\.io$/,
+  /^https:\/\/kyu-sw\.github\.io$/,      // 현재 저장소(KYU-SW/haru-sunlight)의 깃허브 페이지
+  /^https:\/\/mnsjwn\.github\.io$/,      // 이전 저장소 주소
   /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/
 ];
 
