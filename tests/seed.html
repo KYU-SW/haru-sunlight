@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><title>seed</title></head><body>
+<!-- 스크린샷 확인용 시드 페이지: 프로필·위치·날씨캐시·노출이력을 심고 앱으로 넘어간다.
+     서비스키는 앱 기능이 아니라 config.local.js로만 넣으므로 여기서는 다루지 않는다 —
+     날씨는 모의 데이터를 직접 만들어 캐시에 넣는다(§8 캐시 포맷 그대로).
+
+     사용 예)
+       tests/seed.html?tab=home                       평상(기본: 서울, 피크 UVI 7 · 30℃)
+       tests/seed.html?tab=home&uvi=9&temp=37          폭염 모드로
+       tests/seed.html?tab=home&uvi=0.5&temp=22        장마·흐림 모드로 (창 없음)
+       tests/seed.html?tab=weekly
+
+     ⚠️ 겨울 모드는 여기서 재현할 수 없다 — 태양고도는 실제 오늘 날짜·위경도로
+        Solar 모듈이 실시간 계산하므로, 한국 여름 날짜에는 항상 45° 이상이 나온다.
+        기상청 API가 국내 전용이 된 이후로는 남반구 겨울 도시로 우회할 수도 없다.
+        겨울 모드를 보려면 실제 겨울철(11~2월)에 이 화면을 열어야 한다. -->
+<script>
+var q = new URLSearchParams(location.search);
+var NS = 'sunrx.';
+
+localStorage.setItem(NS + 'profile', JSON.stringify({
+  onboarded: true,
+  skinType: +(q.get('skin') || 3),
+  clothing: q.get('cloth') || 'shortShort',
+  spf: +(q.get('spf') || 1),
+  wakeTime: q.get('wake') || '07:00',
+  useCircadian: true,
+  supplement: q.get('supp') === '1',
+  notify: false
+}));
+
+var lat = +(q.get('lat') || 37.5665), lon = +(q.get('lon') || 126.9780);
+localStorage.setItem(NS + 'location', JSON.stringify({
+  lat: lat, lon: lon, name: q.get('city') || '서울', precise: false
+}));
+
+/* 서비스키는 이제 앱 기능이 아니라 config.local.js(window.KMA_SERVICE_KEY)로만 들어온다.
+   여기서는 키가 전혀 없어도 화면을 볼 수 있도록, 아래에서 §8 캐시 포맷 그대로
+   오늘치 모의 날씨를 직접 만들어 넣는다 — WeatherAPI.load()가 캐시를 신선하다고
+   판단하면 기상청을 아예 호출하지 않으므로 키 유무와 무관하게 정상 렌더링된다. */
+(function seedWeather() {
+  var peakUvi = +(q.get('uvi') || 7);
+  var peakTemp = +(q.get('temp') || 30);
+  var today = new Date();
+  var p2 = function (n) { return n < 10 ? '0' + n : '' + n; };
+  var dateKey = today.getFullYear() + '-' + p2(today.getMonth() + 1) + '-' + p2(today.getDate());
+
+  var hourly = [];
+  for (var h = 0; h < 24; h++) {
+    var shape = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+    hourly.push({
+      minuteOfDay: h * 60,
+      uvi: +(peakUvi * shape).toFixed(2),
+      uviClear: null,
+      tempC: +(peakTemp - 10 + 10 * shape).toFixed(1),
+      rh: +(70 - 25 * shape).toFixed(0),
+      feelsLike: null
+    });
+  }
+
+  localStorage.setItem(NS + 'weather', JSON.stringify({
+    source: 'kma', sourceLabel: '기상청 단기예보 · 생활기상지수 (시드 — 모의 데이터)',
+    fetchedAt: Date.now(), dateKey: dateKey,
+    utcOffsetSeconds: 9 * 3600, timezone: 'Asia/Seoul',
+    lat: lat, lon: lon,
+    days: [{ date: dateKey, hourly: hourly, sunrise: dateKey + 'T05:50', sunset: dateKey + 'T19:20' }]
+  }));
+})();
+
+/* 최근 6일 노출 이력 (주간 화면용) */
+if (q.get('hist') !== '0') {
+  var daily = {}, sessions = [], now = new Date();
+  var pcts = [0, 88, 45, 0, 100, 62];
+  pcts.forEach(function (p, i) {
+    var d = new Date(now.getTime() - (6 - i) * 86400000);
+    var key = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    if (!p) return;
+    daily[key] = p;
+    d.setHours(12, 20, 0, 0);
+    sessions.unshift({ dateKey: key, at: d.getTime(), minutes: Math.round(p / 6),
+      percent: p, clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
+  });
+  localStorage.setItem(NS + 'daily', JSON.stringify(daily));
+  localStorage.setItem(NS + 'sessions', JSON.stringify(sessions));
+}
+location.replace('../index.html#' + (q.get('tab') || 'home'));
+</script>
+</body></html>

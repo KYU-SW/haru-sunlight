@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head><meta charset="utf-8"><title>일광 처방 — 스모크 테스트</title></head>
+<body>
+<pre id="out">running…</pre>
+
+<script src="../core/solar.js"></script>
+<script src="../core/engine.js"></script>
+<script src="../core/store.repo.js"></script>
+<script src="../core/kma.geo.js"></script>
+<script src="../core/providers/kma.provider.js"></script>
+<script src="../core/weather.api.js"></script>
+<script src="../shared/ui.js"></script>
+<script src="../core/prescription.js"></script>
+<script src="../shared/chart.js"></script>
+<script src="../shared/notify.js"></script>
+<script src="../features/onboarding/onboarding.service.js"></script>
+<script src="../features/home/home.service.js"></script>
+<script src="../features/timer/timer.service.js"></script>
+<script src="../features/weekly/weekly.service.js"></script>
+<script src="../features/settings/settings.service.js"></script>
+
+<script>
+var L = [], pass = 0, fail = 0;
+function log(s) { L.push(s); }
+function ok(name, cond, extra) {
+  if (cond) { pass++; log('  PASS  ' + name + (extra ? '   ' + extra : '')); }
+  else { fail++; log('  FAIL  ' + name + (extra ? '   ' + extra : '')); }
+}
+function near(a, b, tol) { return Math.abs(a - b) <= tol; }
+
+/* ---------- 1. 엔진 단위 검증 (§2 공식 손계산 대조) ---------- */
+log('── 1. 엔진 · §2 공식');
+var r = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 });
+ok('비타민D = (0.4×300)/(1.5×8×0.40) = 25분', near(r.vitd, 25, 0.001), '실제 ' + r.vitd.toFixed(3));
+ok('화상   = (300×1)/(1.5×8) = 25분',        near(r.burn, 25, 0.001), '실제 ' + r.burn.toFixed(3));
+ok('최종 = min(25, 25) → 화상 한계와 동률',   near(r.minutes, 25, 0.001));
+
+var r2 = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 6, clothing: 'longLong', spf: 30 });
+ok('피부VI+긴팔긴바지 = (0.4×600)/(12×0.10) = 200분', near(r2.vitd, 200, 0.001), '실제 ' + r2.vitd.toFixed(3));
+ok('SPF30 화상한계 = (600×30)/12 = 1500분',       near(r2.burn, 1500, 0.01));
+
+var r3 = Engine.computePoint({ uvi: 0, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 });
+ok('UVI 0 → 무한대(창 안 열림)', !isFinite(r3.minutes));
+
+/* f_BSA는 분모로 확정 → 옷을 더 껴입을수록(노출면적↓) 필요시간이 길어진다.
+   명세 원문(분자)으로 되돌리면 이 테스트도 같이 뒤집어야 한다. */
+var few = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong', spf: 1 }).vitd;
+var many = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 }).vitd;
+ok('긴팔긴바지가 반팔반바지보다 필요시간이 길다 (노출면적이 적을수록 오래)',
+   Engine.F_BSA_IN_DENOMINATOR ? few > many : few < many,
+   '긴팔 ' + few.toFixed(1) + '분 vs 반팔 ' + many.toFixed(1) + '분');
+ok('[구조] SPF를 발라도 비타민D 필요시간은 그대로 (§2 공식에 SPF가 없음)',
+   Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 50 }).vitd === many);
+ok('[구조] 차단제 없을 때 화상 한계 = 비타민D 필요시간 × (f/k) → 반팔반바지면 동률',
+   Math.abs(Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 }).burn / many - 1.0) < 0.01);
+
+/* ---------- 2. §3 열 안전 상한 구간표 ---------- */
+log('── 2. §3 체감온도 구간');
+ok('체감 <31℃ → 제한 없음', Engine.heatCap(30).minutes === Infinity);
+ok('31~35℃ → 20분',        Engine.heatCap(33).minutes === 20);
+ok('35~38℃ → 10분',        Engine.heatCap(36).minutes === 10);
+ok('38℃~ → 0분 (노출 금지)', Engine.heatCap(39).minutes === 0);
+ok('Heat Index 32℃/70% ≈ 41℃', near(Engine.heatIndex(32, 70), 41, 1.5),
+   '실제 ' + Engine.heatIndex(32, 70).toFixed(1));
+
+/* ---------- 3. 태양고도 (NOAA) ---------- */
+log('── 3. 태양고도 · NOAA SPA (서울 37.57/126.98, KST)');
+ok('하지 남중 ≈ 75.9°', near(Solar.maxAltitude(2026, 6, 21, 37.57, 126.98, 9), 75.9, 0.3),
+   Solar.maxAltitude(2026, 6, 21, 37.57, 126.98, 9).toFixed(2) + '°');
+ok('동지 남중 ≈ 29.0°', near(Solar.maxAltitude(2026, 12, 21, 37.57, 126.98, 9), 29.0, 0.3),
+   Solar.maxAltitude(2026, 12, 21, 37.57, 126.98, 9).toFixed(2) + '°');
+ok('동지는 45° 미만 → 겨울 모드', Solar.maxAltitude(2026, 12, 21, 37.57, 126.98, 9) < 45);
+
+/* ---------- 4. §4 모드 판정 우선순위 ---------- */
+log('── 4. §4 모드 판정 (판정 순서대로 첫 히트)');
+var W = [{ recommendStart: 600, recommendMinutes: 10 }, { recommendStart: 840, recommendMinutes: 12 }];
+ok('겨울이 최우선', Engine.decideMode({ maxAltitude: 40, maxHeatIndexC: 40, windows: W }).id === 'winter');
+var heat = Engine.decideMode({ maxAltitude: 70, maxHeatIndexC: 33, windows: W });
+ok('폭염 2순위 · 오전 창만 남김', heat.id === 'heat' && heat.windows.length === 1);
+ok('장마 3순위 (창 0개)', Engine.decideMode({ maxAltitude: 70, maxHeatIndexC: 25, windows: [] }).id === 'cloudy');
+ok('나머지는 평상',     Engine.decideMode({ maxAltitude: 70, maxHeatIndexC: 25, windows: W }).id === 'normal');
+
+/* 권장 시점은 '안전 한계에 잘린 짧은 시각'이 아니라
+   '목표를 실제로 채울 수 있는 시각'이어야 한다 */
+(function () {
+  function pt(min, vitd, burn, heat) {
+    return { minuteOfDay: min, vitd: vitd, burn: burn, heat: heat,
+             minutes: Math.min(vitd, burn, heat), open: true,
+             limitedBy: Math.min(vitd,burn,heat) === heat ? 'heat' : (Math.min(vitd,burn,heat) === burn ? 'burn' : 'vitd') };
+  }
+  // 12시: 25분(달성 가능) / 14시: 열 상한 20분에 잘림
+  var w = Engine.findWindows([
+    pt(720, 25, 40, Infinity),
+    pt(780, 33, 40, 20)
+  ])[0];
+  ok('권장 시점 = 잘린 20분(14시)이 아니라 달성 가능한 25분(12시)',
+     w.recommendStart === 720 && w.recommendMinutes === 25,
+     UI.hm(w.recommendStart) + ' · ' + w.recommendMinutes + '분');
+  ok('달성 가능한 시점이 있으면 completable = true', w.completable === true);
+
+  // 전 구간이 잘리는 경우엔 기존대로 최소값을 쓰되 completable=false로 표시
+  var w2 = Engine.findWindows([pt(720, 60, 40, 20), pt(780, 55, 40, 20)])[0];
+  ok('전부 잘리면 completable = false (화면에서 "목표 못 채움" 안내)', w2.completable === false);
+})();
+
+/* ---------- 5. 창 열림 3조건 ---------- */
+log('── 5. 창이 열리는 조건');
+var okr = { heat: Infinity, minutes: 20 };
+ok('고도 44° → 닫힘', Engine.isOpen(44, okr) === false);
+ok('고도 46° → 열림', Engine.isOpen(46, okr) === true);
+ok('열 상한 0 → 닫힘', Engine.isOpen(60, { heat: 0, minutes: 5 }) === false);
+ok('필요시간 61분 → 닫힘', Engine.isOpen(60, { heat: Infinity, minutes: 61 }) === false);
+
+/* ---------- 6. 저장소 · 충전률 · 반감기 ---------- */
+log('── 6. 저장소 · 충전률');
+Repo.reset();
+Repo.setProfile({ onboarded: true, skinType: 3, clothing: 'shortShort', spf: 1, wakeTime: '07:00' });
+var todayKey = Engine.dayKey(new Date());
+Repo.addCharge(todayKey, 70);
+ok('충전 기록', Repo.getDaily()[todayKey] === 70);
+var wk = Engine.weeklyCharge(Repo.getDaily());
+ok('주간 = 70/7 = 10%', wk.percent === 10, '실제 ' + wk.percent + '%');
+var d2 = {}; d2[todayKey] = 100;
+ok('오늘만 100% → 체내 저장량 < 100 (과거분 감가)', Engine.bodyStore(d2) < 100 && Engine.bodyStore(d2) > 3,
+   Engine.bodyStore(d2).toFixed(1) + '%');
+ok('연속 미노출일 계산', Engine.consecutiveMissDays({}, false) >= 1);
+
+/* ---------- 7. §6 생체리듬 ---------- */
+log('── 7. §6 생체리듬');
+var c = Engine.circadian(UI.timeToMin('07:00'), 600);
+ok('Tmin = 기상 − 2h = 05:00', UI.hm(c.tmin) === '05:00');
+ok('빛 회피 창 = 기상 + 16h = 23:00', UI.hm(c.avoidStart) === '23:00');
+ok('Tmin 이후 노출 → 위상 전진', c.phase === 'advance');
+ok('Tmin 이전 노출 → 위상 지연', Engine.circadian(UI.timeToMin('07:00'), 240).phase === 'delay');
+
+/* ---------- 8. 기상청 좌표 변환 ---------- */
+log('── 8. 기상청 좌표 변환 (KmaGeo)');
+/* 시청 좌표(위경도)로 계산한 값과 기상청 공식 관측지점 격자값을 비교한다.
+   두 좌표가 미세하게 달라 경계에서 ±1칸 어긋날 수 있으므로 허용오차를 둔다 —
+   실패하면 알고리즘 문제, 1칸 이내 차이는 좌표 기준점 차이일 뿐 문제 없음. */
+[['서울',37.5665,126.9780,60,127],['부산',35.1796,129.0756,98,76],
+ ['대구',35.8714,128.6014,89,90],['인천',37.4563,126.7052,55,124],
+ ['광주',35.1595,126.8526,58,74],['대전',36.3504,127.3845,67,100],
+ ['제주',33.4996,126.5312,52,38]].forEach(function (c) {
+  var g = KmaGeo.toGrid(c[1], c[2]);
+  ok('격자 변환 ' + c[0] + ' ≈ (' + c[3] + ',' + c[4] + ') ±1칸',
+     Math.abs(g.nx - c[3]) <= 1 && Math.abs(g.ny - c[4]) <= 1,
+     '실제 (' + g.nx + ',' + g.ny + ')');
+});
+ok('국내 좌표 판정 — 서울은 국내', KmaGeo.inKorea(37.57, 126.98) === true);
+ok('국내 좌표 판정 — 도쿄는 국외', KmaGeo.inKorea(35.68, 139.69) === false);
+ok('국내 좌표 판정 — 퀸즈타운은 국외', KmaGeo.inKorea(-45.03, 168.66) === false);
+
+/* ---------- 9. 기상청 응답 파싱·병합 (KmaProvider) ----------
+   ⚠️ 실서비스키가 없어 네트워크 호출 대신, 공공데이터포털 문서(Swagger) 그대로의
+   응답 구조로 모의 데이터를 만들어 파싱·병합·처방 파이프라인을 검증한다.
+   실제 키가 생기면 설정 화면의 "연결 확인" 버튼으로 최종 확인해야 한다. */
+log('── 9. 기상청 응답 파싱 · 병합 (모의 데이터, 실키 미보유)');
+
+var _ = KmaProvider._;
+ok('encKey — 원본 키는 인코딩', _.encKey('ab+c/d') === encodeURIComponent('ab+c/d'));
+ok('encKey — 이미 인코딩된 키는 그대로', _.encKey('ab%2Bc') === 'ab%2Bc');
+
+/* 단기예보 응답 모양 그대로: category TMP/REH, fcstDate/fcstTime/fcstValue */
+function fcstItem(dateStr, hour, cat, val) {
+  return { category: cat, fcstDate: dateStr, fcstTime: (hour < 10 ? '0' + hour : hour) + '00', fcstValue: String(val) };
+}
+var today = new Date();
+var y = today.getFullYear(), mo = today.getMonth() + 1, d = today.getDate();
+var dateStr = '' + y + (mo < 10 ? '0' + mo : mo) + (d < 10 ? '0' + d : d);
+var dateKey = y + '-' + (mo < 10 ? '0' + mo : mo) + '-' + (d < 10 ? '0' + d : d);
+
+var fcstItems = [];
+for (var h = 0; h < 24; h++) {
+  /* 한여름 서울과 비슷한 형태의 곡선 — 정오 근처 최고 */
+  var temp = 22 + 8 * Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+  var rh = 75 - 25 * Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+  fcstItems.push(fcstItem(dateStr, h, 'TMP', temp.toFixed(1)));
+  fcstItems.push(fcstItem(dateStr, h, 'REH', rh.toFixed(0)));
+}
+var parsedFcst = _.parseForecast(fcstItems);
+ok('parseForecast — 오늘 날짜 키 생성', !!parsedFcst[dateKey]);
+ok('parseForecast — 24시간 모두 채워짐', Object.keys(parsedFcst[dateKey]).length === 24);
+ok('parseForecast — TMP/REH 둘 다 파싱', parsedFcst[dateKey][12].tempC > 25 && parsedFcst[dateKey][12].rh > 0,
+   '12시 ' + parsedFcst[dateKey][12].tempC + '℃ / ' + parsedFcst[dateKey][12].rh + '%');
+
+/* 생활기상지수 응답 모양 그대로: h0~h75, 3시간 간격, 06시 발표 기준 여름 UVI 곡선 */
+var uvBase = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 6, 0, 0);
+var uvItem = { areaNo: '1100000000', date: dateStr + '06' };
+for (var hh = 0; hh <= 75; hh += 3) {
+  var hourOfDay = (6 + hh) % 24;
+  var v = Math.max(0, 9 * Math.sin((hourOfDay - 6) / 12 * Math.PI));
+  uvItem['h' + hh] = v.toFixed(1);
+}
+var parsedUv = _.parseUv({ item: uvItem, base: uvBase });
+ok('parseUv — 3시간 간격 26개 표본', parsedUv.length === 26, parsedUv.length + '개');
+ok('parseUv — 정오 근처 UV가 가장 높다',
+   parsedUv.reduce(function (m, p) { return Math.max(m, p.uvi); }, 0) > 7);
+
+var noonMs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 13, 0, 0).getTime();
+var interp = _.uvAt(parsedUv, noonMs);
+ok('uvAt — 3시간 표본 사이 선형보간', interp > 0 && interp < 10, '13시 보간값 ' + interp.toFixed(2));
+ok('uvAt — 발표 이전 시각은 0', _.uvAt(parsedUv, uvBase.getTime() - 3600000) === 0);
+
+var loc = { lat: 37.5665, lon: 126.9780, name: '서울' };
+var mergedDays = _.merge(parsedFcst, parsedUv, loc);
+ok('merge — 하루치 병합', mergedDays.length === 1 && mergedDays[0].date === dateKey);
+ok('merge — 일출·일몰을 직접 계산해 채운다 (기상청은 안 줌)',
+   !!mergedDays[0].sunrise && !!mergedDays[0].sunset,
+   mergedDays[0].sunrise + ' ~ ' + mergedDays[0].sunset);
+ok('merge — uviClear는 항상 null (기상청은 청천 UV 없음)',
+   mergedDays[0].hourly[12].uviClear === null);
+
+/* ---------- 10. 모의 데이터로 처방 파이프라인 전체 실행 ---------- */
+log('── 10. 모의 데이터 기반 하루 처방 파이프라인');
+Repo.reset();
+Repo.setProfile({ onboarded: true, skinType: 3, clothing: 'shortShort', spf: 1, wakeTime: '07:00' });
+Repo.setLocation(loc);
+
+var weather = {
+  source: 'kma', fetchedAt: Date.now(), dateKey: dateKey,
+  utcOffsetSeconds: 9 * 3600, timezone: 'Asia/Seoul',
+  lat: loc.lat, lon: loc.lon, days: mergedDays
+};
+
+var profile = Repo.getProfile();
+var rx = Prescription.forToday(weather, loc, profile);
+ok('오늘 처방 생성', !!rx);
+log('        날짜 ' + rx.dateKey + ' · 모드 ' + rx.mode.label +
+    ' · 최대고도 ' + rx.maxAltitude.toFixed(1) + '° · 최고체감 ' + rx.maxHeatIndexC.toFixed(1) + '℃');
+log('        창 ' + rx.windows.length + '개' +
+    rx.windows.map(function (x) {
+      return ' [' + UI.hm(x.start) + '~' + UI.hm(x.end) + ' → ' +
+             UI.hm(x.recommendStart) + '부터 ' + x.recommendMinutes + '분, 제한=' + x.best.limitedBy + ']';
+    }).join(''));
+
+rx.windows.forEach(function (x) {
+  ok('창 내부 고도 ≥45°', x.best.altitude >= 45, x.best.altitude.toFixed(1) + '°');
+  ok('창 내부 필요시간 ≤60분', x.recommendMinutes <= 60, x.recommendMinutes + '분');
+});
+ok('열 안전 상한이 §3 NOAA Heat Index로 계산됨 (기상청은 체감온도를 안 줌)',
+   rx.nowPoint.heatFromForecast === false);
+
+var m = HomeService.build(rx, { stale: false });
+ok('홈 뷰모델 생성', !!m && !!m.hero && m.limits.length === 3);
+ok('제한 요인 하나만 승자', m.limits.filter(function (l) { return l.win; }).length === 1,
+   m.limits.filter(function (l) { return l.win; }).map(function (l) { return l.name; }).join());
+ok('그래프 SVG 생성', m.chart.indexOf('<svg') === 0);
+log('        히어로: ' + (m.hero.kicker || m.hero.headline) + ' / ' + (m.hero.minutes || '—') + '분');
+log('        결정자: ' + m.limits.filter(function (l) { return l.win; })[0].name);
+if (m.gap) log('        §5 대체안내: ' + m.gap.title + ' · 주간 ' + m.gap.weeklyPercent + '%');
+
+/* 타이머 — 누적 선량 방식.
+   '지금'을 정오 13:00으로 고정해 검사한다. 실제 시계에 맡기면 밤에 돌릴 때
+   UVI가 0이라 필요시간이 Infinity가 되어 테스트가 시각에 따라 흔들린다. */
+var _realLocalNow = Prescription.localNow;
+Prescription.localNow = function () {
+  return { date: new Date(), minute: 13 * 60, key: dateKey };
+};
+
+TimerService.start(rx, rx.targetWindow);
+var snap = TimerService.tick();
+ok('타이머 시작', TimerService.isRunning() && snap.percent >= 0);
+var before = snap.requiredMin;
+Repo.setProfile({ clothing: 'longLong' });
+var after = TimerService.tick().requiredMin;
+ok('옷차림 변경 시 필요시간 즉시 재계산 (13:00 고정 기준)',
+   isFinite(before) && isFinite(after) && Math.abs(after - before) > 0.001,
+   before.toFixed(1) + '분 → ' + after.toFixed(1) + '분');
+var fin = TimerService.stop();
+ok('종료 시 이력 기록', Repo.getSessions().length === 1 && fin.minutes >= 1);
+
+Prescription.localNow = _realLocalNow;
+
+var wm = WeeklyService.build(weather, loc, Repo.getProfile());
+ok('주간 뷰모델 생성', wm.bars.length === 7);
+ok('설정 뷰모델', !!SettingsService.model().profile);
+
+/* ---------- 11. WeatherAPI 파사드 — 키 유무·국내 판정 ----------
+   서비스키는 이제 앱 기능(localStorage)이 아니라 config.local.js가 채우는
+   window.KMA_SERVICE_KEY 전역 하나뿐이다. 여기서는 그 전역을 직접 조작해 검증한다. */
+log('── 11. WeatherAPI 파사드');
+window.KMA_SERVICE_KEY = '';
+ok('키 없으면 hasKey() = false', WeatherAPI.hasKey() === false);
+window.KMA_SERVICE_KEY = '  dummy-key  ';
+ok('키 있으면 hasKey() = true (앞뒤 공백은 무시)', WeatherAPI.hasKey() === true);
+ok('inKorea() 위임', WeatherAPI.inKorea(37.57, 126.98) === true && WeatherAPI.inKorea(28.61, 77.21) === false);
+
+/* 공개 링크용 중계 서버 경로 — 키가 없으면 KMA_PROXY_URL로, 키가 있으면 기상청 직접 */
+var sProxy = _.source('', 'https://proxy.example.dev/');
+ok('키 없으면 중계 서버 경로(/fcst · /uv)를 쓴다', sProxy.via === 'proxy' &&
+   sProxy.fcst === 'https://proxy.example.dev/fcst' && sProxy.uv === 'https://proxy.example.dev/uv');
+ok('중계 서버 요청 URL에는 serviceKey가 붙지 않는다', sProxy.auth === '?');
+var sDirect = _.source('a+b/c', 'https://proxy.example.dev');
+ok('로컬 키가 있으면 중계 서버보다 직접 호출이 우선', sDirect.via === 'direct' &&
+   sDirect.fcst === KmaProvider.FCST_URL && sDirect.auth === '?serviceKey=a%2Bb%2Fc&');
+window.KMA_PROXY_URL = ' https://proxy.example.dev ';
+ok('hasProxy() — config.js 주소 인식(앞뒤 공백 무시)', WeatherAPI.hasProxy() === true);
+window.KMA_PROXY_URL = '';
+ok('주소 없으면 hasProxy() = false', WeatherAPI.hasProxy() === false);
+
+window.KMA_SERVICE_KEY = '';
+var rejected = false, taggedNoKey = false;
+WeatherAPI.load(loc, true).catch(function (e) {
+  rejected = /서비스키/.test(e.message);
+  taggedNoKey = e.noKey === true;
+}).then(function () {
+  ok('키 없이 load() 호출 시 명확한 에러로 거부', rejected);
+  ok('키 없음 에러에 noKey 플래그가 붙는다 (App이 안내 화면과 구분하는 용도)', taggedNoKey);
+  done();
+});
+
+function done() {
+  Repo.reset();
+  L.unshift('결과: ' + pass + ' PASS / ' + fail + ' FAIL\n');
+  document.getElementById('out').textContent = L.join('\n');
+  document.title = fail ? 'FAIL ' + fail : 'ALL PASS ' + pass;
+}
+</script>
+</body>
+</html>

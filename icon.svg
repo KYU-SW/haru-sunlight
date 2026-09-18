@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#3D8BFF"/>
+      <stop offset="100%" stop-color="#2C6EE8"/>
+    </linearGradient>
+    <linearGradient id="sun" x1="0.3" y1="0" x2="0.7" y2="1">
+      <stop offset="0%" stop-color="#FFE480"/>
+      <stop offset="100%" stop-color="#F8CB45"/>
+    </linearGradient>
+    <filter id="soft" x="-40%" y="-40%" width="180%" height="180%">
+      <feDropShadow dx="0" dy="6" stdDeviation="8" flood-color="#17429B" flood-opacity=".26"/>
+    </filter>
+  </defs>
+
+  <!-- 배경 -->
+  <rect width="512" height="512" rx="120" fill="url(#bg)"/>
+
+  <!-- 햇살 8줄기 (안쪽 133 → 바깥쪽 208, 해와 띄워서) -->
+  <g stroke="#FBD75C" stroke-width="22" stroke-linecap="round" filter="url(#soft)">
+    <line x1="256" y1="123" x2="256" y2="48"/>
+    <line x1="256" y1="389" x2="256" y2="464"/>
+    <line x1="123" y1="256" x2="48"  y2="256"/>
+    <line x1="389" y1="256" x2="464" y2="256"/>
+    <line x1="162" y1="162" x2="109" y2="109"/>
+    <line x1="350" y1="162" x2="403" y2="109"/>
+    <line x1="350" y1="350" x2="403" y2="403"/>
+    <line x1="162" y1="350" x2="109" y2="403"/>
+  </g>
+
+  <!-- 해 -->
+  <circle cx="256" cy="256" r="110" fill="url(#sun)" filter="url(#soft)"/>
+
+  <!-- 볼 -->
+  <ellipse cx="186" cy="272" rx="20" ry="13" fill="#F79A5B" opacity=".48"/>
+  <ellipse cx="326" cy="272" rx="20" ry="13" fill="#F79A5B" opacity=".48"/>
+
+  <!-- 눈 · 미소 -->
+  <g fill="none" stroke="#6E3F17" stroke-width="14" stroke-linecap="round">
+    <path d="M196 250 Q215 228 234 250"/>
+    <path d="M278 250 Q297 228 316 250"/>
+    <path d="M223 289 Q256 320 289 289"/>
+  </g>
+</svg>

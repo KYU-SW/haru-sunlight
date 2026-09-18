@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>하루 햇빛 · 브라우저 초기화</title>
+<style>
+  body { margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+         background:#EEF1F7; font-family:Pretendard,-apple-system,'Malgun Gothic',sans-serif; color:#141A24; }
+  .box { width:340px; background:#fff; border-radius:24px; padding:28px 24px;
+         box-shadow:0 8px 30px rgba(23,43,77,.1); }
+  h1 { margin:0 0 6px; font-size:20px; letter-spacing:-.6px; }
+  p  { margin:0 0 18px; font-size:13px; color:#6B7684; line-height:1.6; }
+  ul { margin:0 0 18px; padding:0; list-style:none; font-size:13px; line-height:2; }
+  li b { color:#2B63F6; }
+  a.go { display:block; text-align:center; background:#2B63F6; color:#fff; text-decoration:none;
+         padding:14px; border-radius:99px; font-weight:700; font-size:15px; }
+</style>
+</head>
+<body>
+<div class="box">
+  <h1>브라우저 초기화</h1>
+  <p>고친 코드가 화면에 안 나올 때 여기를 한 번 열면 됩니다.
+     저장된 옛 파일과 서비스워커를 지웁니다. (설정·기록은 그대로 둡니다)</p>
+  <ul id="log"></ul>
+  <a class="go" href="index.html">앱으로 가기</a>
+</div>
+
+<script>
+/* 초기 버전의 '캐시 우선' 서비스워커가 브라우저에 남아 있으면
+   서버가 새 파일을 줘도 옛 화면이 계속 뜬다. 그걸 뿌리째 지운다. */
+(function () {
+  var log = document.getElementById('log');
+  function say(t) { var li = document.createElement('li'); li.innerHTML = t; log.appendChild(li); }
+
+  var jobs = [];
+
+  if ('serviceWorker' in navigator) {
+    jobs.push(navigator.serviceWorker.getRegistrations().then(function (rs) {
+      if (!rs.length) return say('서비스워커 <b>없음</b>');
+      return Promise.all(rs.map(function (r) { return r.unregister(); }))
+        .then(function () { say('서비스워커 <b>' + rs.length + '개 삭제</b>'); });
+    }));
+  }
+
+  if (window.caches) {
+    jobs.push(caches.keys().then(function (ks) {
+      if (!ks.length) return say('저장된 캐시 <b>없음</b>');
+      return Promise.all(ks.map(function (k) { return caches.delete(k); }))
+        .then(function () { say('캐시 <b>' + ks.length + '개 삭제</b>'); });
+    }));
+  }
+
+  Promise.all(jobs).then(function () {
+    say('정리 끝 — <b>3초 뒤 앱으로 이동</b>');
+    setTimeout(function () { location.replace('index.html?fresh=' + Date.now()); }, 3000);
+  });
+})();
+</script>
+</body>
+</html>

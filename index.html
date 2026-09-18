@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#FFFFFF">
+<meta name="description" content="오늘 언제 몇 분 햇빛을 쬐야 비타민D가 채워지는지 계산해 주는 앱">
+<title>하루 햇빛</title>
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<!-- 휴대폰 틀 — 데스크톱에서는 9:19.5 비율 기기 모양으로, 휴대폰에서는 화면 전체로.
+     안쪽의 position:fixed 요소(하단 탭·바텀시트·토스트·시작 화면)가 브라우저 창이 아니라
+     이 틀을 기준으로 잡히도록 CSS에서 transform으로 컨테이닝 블록을 만든다. -->
+<div class="phone">
+
+<!-- 데스크톱 미리보기 전용 상태바 · 다이내믹 아일랜드 — 실제 휴대폰에서는 숨긴다(폰 자체 상태바가 있으므로) -->
+<div class="sbar" aria-hidden="true">
+  <span class="sbar-time" id="sbar-time">9:41</span>
+  <span class="sbar-island"></span>
+  <span class="sbar-r">
+    <svg viewBox="0 0 18 12" fill="currentColor"><rect x="0" y="8" width="3" height="4" rx="1"/><rect x="5" y="5.5" width="3" height="6.5" rx="1"/><rect x="10" y="3" width="3" height="9" rx="1"/><rect x="15" y="0" width="3" height="12" rx="1"/></svg>
+    <svg viewBox="0 0 16 12" fill="currentColor"><path d="M8 2.2c2.4 0 4.6.9 6.3 2.5l1.2-1.3A10.6 10.6 0 008 .4C5.1.4 2.5 1.5.5 3.4l1.2 1.3A9 9 0 018 2.2zm0 3.5c1.5 0 2.8.5 3.8 1.4l1.2-1.3A7.3 7.3 0 008 3.9c-1.9 0-3.7.7-5 1.9l1.2 1.3c1-.9 2.3-1.4 3.8-1.4zm0 3.4c.6 0 1.1.2 1.5.6L8 11.4 6.5 9.7c.4-.4.9-.6 1.5-.6z"/></svg>
+    <span class="sbar-bat"><i></i></span>
+  </span>
+</div>
+<script>
+(function () {
+  function tick() {
+    var d = new Date(), el = document.getElementById('sbar-time');
+    if (el) el.textContent = d.getHours() + ':' + ('0' + d.getMinutes()).slice(-2);
+  }
+  tick(); setInterval(tick, 15000);
+})();
+</script>
+
+<div id="app">
+  <div class="screen active" id="screen-home"></div>
+  <div class="screen" id="screen-timer"></div>
+  <div class="screen" id="screen-weekly"></div>
+  <div class="screen" id="screen-settings"></div>
+
+  <nav class="tabs">
+    <button class="tab on" data-tab="home" aria-label="홈">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.2 2.6a1.3 1.3 0 011.6 0l8 6.3c.3.3.5.6.5 1V20a1.5 1.5 0 01-1.5 1.5H15v-6.2a1 1 0 00-1-1h-4a1 1 0 00-1 1v6.2H4.2A1.5 1.5 0 012.7 20V9.9c0-.4.2-.7.5-1z"/></svg>
+      <span class="tab-l">홈</span>
+    </button>
+    <button class="tab" data-tab="timer" aria-label="타이머">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9 1.5h6a1 1 0 010 2h-2v1.6A9 9 0 1111 5.1V3.5H9a1 1 0 010-2zm3 7a1 1 0 00-1 1V13c0 .3.1.5.3.7l2.5 2.5a1 1 0 001.4-1.4L13 12.6V9.5a1 1 0 00-1-1z"/></svg>
+      <span class="tab-l">타이머</span>
+    </button>
+    <button class="tab" data-tab="settings" aria-label="마이페이지">
+      <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="7.5" r="4.5"/><path d="M3.5 20.2C3.5 15.9 7.3 13.5 12 13.5s8.5 2.4 8.5 6.7c0 .7-.6 1.3-1.3 1.3H4.8c-.7 0-1.3-.6-1.3-1.3z"/></svg>
+      <span class="tab-l">마이페이지</span>
+    </button>
+  </nav>
+</div>
+
+<div id="login"></div>
+<div id="onboarding"></div>
+
+<div class="sheet-bg" id="sheet-bg">
+  <div class="sheet" id="sheet-body"></div>
+</div>
+
+<div id="toast"></div>
+
+</div><!-- /.phone -->
+
+<!-- 공개 설정 — 중계 서버 주소(키 없음). 링크로 들어온 사람은 이 경로로 날씨를 받는다. -->
+<script src="config.js"></script>
+
+<!-- 기상청 서비스키 — 앱 기능이 아니라 이 파일로만 넣는다.
+     config.local.js는 .gitignore에 등록돼 있어 깃허브에 올라가지 않는다.
+     없으면 이 한 줄만 404로 조용히 실패하고 나머지는 정상 동작한다(키 없음 화면으로 안내). -->
+<script src="config.local.js"></script>
+
+<!-- ===== 백엔드 계층 (core) — 순수 로직 · 데이터 · DOM 접근 없음 ===== -->
+<script src="core/solar.js"></script>
+<script src="core/engine.js"></script>
+<script src="core/store.repo.js"></script>
+<script src="core/kma.geo.js"></script>
+<script src="core/providers/kma.provider.js"></script>
+<script src="core/weather.api.js"></script>
+
+<!-- ===== 공용 (shared) ===== -->
+<script src="shared/ui.js"></script>
+<script src="core/prescription.js"></script>
+<script src="shared/chart.js"></script>
+<script src="shared/notify.js"></script>
+
+<!-- ===== 기능별 서비스(로직) + 뷰(화면) ===== -->
+<script src="features/login/login.view.js"></script>
+<script src="features/onboarding/onboarding.service.js"></script>
+<script src="features/onboarding/onboarding.view.js"></script>
+<script src="features/home/home.service.js"></script>
+<script src="features/home/home.view.js"></script>
+<script src="features/timer/timer.service.js"></script>
+<script src="features/timer/timer.view.js"></script>
+<script src="features/weekly/weekly.service.js"></script>
+<script src="features/weekly/weekly.view.js"></script>
+<script src="features/settings/settings.service.js"></script>
+<script src="features/settings/settings.view.js"></script>
+
+<!-- ===== 앱 셸 ===== -->
+<script src="shared/app.js"></script>
+</body>
+</html>
