@@ -15,170 +15,142 @@ var HomeView = (function () {
   function render(m) {
     el = document.getElementById('screen-home');
     el.innerHTML =
-      header(m) +
-      (m.stale ? '<div class="stale">⚠️ 네트워크 연결이 안 돼 저장된 예보로 계산했어요</div>' : '') +
-      summaryCard(m) +
-      /* 타이머 시작 CTA — '오늘의 처방' 카드 바로 아래에 가로로 길게 둔다. */
-      ctaWide(m) +
-      /* 창이 있으면 '오늘 열리는 창', 없으면 그 자리에 대체 수단이 온다.
-         '무엇이 이 시간을 정했나'와 하단 이동 행들은 마이페이지로 옮겼다. */
-      (m.windows.length ? windowsCard(m) : '') +
-      (m.gap ? gapCard(m) : '');
+      head(m) +
+      '<div class="ha-wrap">' +
+        (m.stale ? '<div class="stale" style="margin:0">⚠️ 네트워크 연결이 안 돼 저장된 예보로 계산했어요</div>' : '') +
+        greeting(m) +
+        heroTile(m) +
+        miniTiles(m) +
+        (m.windows.length > 1 ? slotsCard(m) : '') +
+      '</div>';
     bind(m);
   }
 
-  /* ---------- 헤더 : 큰 제목 + 원형 버튼 ---------- */
-  function header(m) {
+  function tf(e) { return '<span class="tf">' + e + '</span>'; }
+
+  function uvLevel(u) {
+    if (u < 3) return '낮음';
+    if (u < 6) return '보통';
+    if (u < 8) return '높음';
+    if (u < 11) return '매우 높음';
+    return '위험';
+  }
+
+  /* ---------- 머리 : 로고 + 아이콘 / 날짜 (지역은 마이페이지에서만) ---------- */
+  function head(m) {
     var d = m.rx.date;
     var dow = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
-    var dateShort = (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + dow;
     var notifyOn = m.rx.profile.notify && Notify.granted();
-
-    return '<div class="hdr">' +
-      '<div class="hdr-l">' +
-        '<div class="hdr-t">하루 햇빛</div>' +
-        '<div class="hdr-d">' + UI.esc(m.loc.name) + ' · ' + dateShort + '</div>' +
+    return '<div class="ha-top">' +
+        '<div class="ha-logo">하루<span>햇빛</span></div>' +
+        '<div class="ha-icons">' +
+          '<button id="h-bell" aria-label="알림">' + UI.ICON.bell + (notifyOn ? '<i class="ha-dot"></i>' : '') + '</button>' +
+          '<button id="h-refresh" aria-label="날씨 새로고침">' + UI.ICON.refresh + '</button>' +
+        '</div>' +
       '</div>' +
-      '<div class="hdr-acts">' +
-        '<button class="iconbtn" id="h-loc" aria-label="지역 바꾸기">' + UI.ICON.pin + '</button>' +
-        '<button class="iconbtn" id="h-evi" aria-label="계산 근거 보기">' + UI.ICON.sliders + '</button>' +
-        '<button class="iconbtn" id="h-bell" aria-label="알림">' + UI.ICON.bell +
-          (notifyOn ? '<span class="dot"></span>' : '') + '</button>' +
-        '<button class="iconbtn" id="h-refresh" aria-label="날씨 새로고침">' +
-          UI.ICON.refresh + '</button>' +
-      '</div>' +
-    '</div>';
+      '<div class="ha-loc">' + (d.getMonth() + 1) + '월 ' + d.getDate() + '일 ' + dow + '요일</div>';
   }
 
-  /* ---------- 타이머 시작 CTA : '오늘의 처방' 카드 아래에 가로로 길게 ----------
-     예전엔 이 버튼이 원형 버튼들과 한 줄에 있는 파란 알약이었다.
-     이제 오늘의 처방(summaryCard) 바로 밑에 화면 너비만큼 길게 배치해
-     '지금 무엇을 해야 하는지'가 처방 다음 동작으로 바로 이어지게 한다. */
-  function ctaWide(m) {
-    var h = m.hero;
+  /* ---------- 오늘의 한마디 — 날짜마다 하나씩 (같은 날엔 새로고침해도 그대로) ----------
+     창이 없는 날에 '나가 볼까요'가 뜨면 어색하므로 문구 묶음을 나눈다. */
+  var GREET_OPEN = [
+    '또 오셨네요!<br>오늘도 <em>햇빛</em> 쬐어 볼까요?',
+    '반가워요!<br>오늘 <em>햇빛 시간</em> 알려드릴게요',
+    '커피 한 잔 대신<br><em>햇빛 한 잔</em> 어때요?',
+    '오늘 <em>햇빛</em>,<br>미리 확인해 뒀어요',
+    '잠깐 <em>바람 쐬러</em><br>나가 볼까요?',
+    '오늘은 <em>몇 분</em>이면 될지<br>같이 볼까요?',
+    '창밖 날씨는<br><em>저희가</em> 보고 있을게요'
+  ];
+  var GREET_CLOSED = [
+    '오늘은 <em>쉬어 가는 날</em>이에요',
+    '<em>햇빛</em>은 내일 또 와요',
+    '<em>내일</em> 다시 만나요'
+  ];
+
+  function greeting(m) {
+    var d = m.rx.date;
+    var day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
+    var pool = m.hero.state === 'closed' ? GREET_CLOSED : GREET_OPEN;
+    return '<div class="ha-greet">' + pool[day % pool.length] + '</div>';
+  }
+
+  /* ---------- 처방 타일 ---------- */
+  function heroTile(m) {
+    var h = m.hero, big, sub, art;
+    if (h.state === 'open') {
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · 지금 나가면 좋아요'; art = '☀️';
+    } else if (h.state === 'waiting') {
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · ' + h.kicker + ' 시작'; art = '🌤️';
+    } else {
+      big = h.headline; sub = h.when; art = h.passed ? '🌇' : '🌧️';
+    }
+
     var cta;
     if (h.cta) {
-      cta = '<button class="act-cta wide" id="h-cta">' +
+      cta = '<button class="ha-cta" id="h-cta">' +
               (h.cta.action === 'timer' ? UI.ICON.play : UI.ICON.bell) + h.cta.label + '</button>';
     } else if (h.passed) {
-      /* 오늘 햇빛 쬘 수 있는 시간이 이미 다 지났다 — 더 할 수 있는 행동이 없으니
-         버튼 자체를 아예 띄우지 않는다(내일 다시 열린다는 안내는 summaryCard에 있다). */
-      return '';
+      cta = '<button class="ha-cta" id="h-cta-tomorrow">' + UI.ICON.bell + '내일 알림 받기</button>';
     } else {
-      /* 예전엔 '대체 수단 보기'가 아래 음식 카드로 스크롤만 해서
-         무엇을 하는 버튼인지 알기 어려웠다. 이제 타이머로 보내
-         '얼마나 나가야 하는지'를 직접 보여 준다(오늘 창이 없으면 내일 창 기준). */
-      cta = '<button class="act-cta wide" id="h-cta-time">' + UI.ICON.timer +
-            '나가야 할 시간 보기</button>';
+      cta = '<button class="ha-cta" id="h-cta-time">' + UI.ICON.timer + '나가야 할 시간 보기</button>';
     }
-    return '<div class="cta-wrap">' + cta + '</div>';
+
+    return '<section class="ha-t ha-hero">' +
+      '<div class="ha-lab">오늘의 처방</div>' +
+      '<div class="ha-big' + (h.state === 'closed' ? ' sm' : '') + '">' + big + '</div>' +
+      '<div class="ha-sub">' + sub + '</div>' +
+      '<div class="ha-art">' + tf(art) + '</div>' +
+      cta +
+      (h.sub ? '<div class="ha-foot"><button id="h-cta-sub">' + h.sub.label + '</button></div>' : '') +
+    '</section>';
   }
 
-  /* ---------- 요약 카드 : 큰 수치 + 알약 막대 ---------- */
-  function summaryCard(m) {
-    var h = m.hero;
+  /* ---------- 기온 · 자외선 — 한 카드에 위아래로, 가운데는 5단계 막대 ----------
+     자외선: 기상청 자외선지수 5단계(낮음 <3 · 보통 <6 · 높음 <8 · 매우 높음 <11 · 위험)
+     기온:   체감온도 기준. 위 두 칸은 기상청 폭염특보 기준(체감 33℃ 주의보 · 35℃ 경보),
+             아래 세 칸은 선선 <18 · 쾌적 <26 · 더움 <33 */
+  var UV_CUT = [3, 6, 8, 11];
+  var HEAT_CUT = [18, 26, 33, 35];
+  var HEAT_WORD = ['선선', '쾌적', '더움', '폭염 주의', '폭염 경고'];
+
+  function step(v, cuts) {
+    for (var i = 0; i < cuts.length; i++) if (v < cuts[i]) return i + 1;
+    return cuts.length + 1;
+  }
+
+  function levelBar(n) {
+    var s = '';
+    for (var i = 1; i <= 5; i++) s += '<i' + (i <= n ? ' class="on"' : '') + '></i>';
+    return '<span class="ha-bar">' + s + '</span>';
+  }
+
+  function miniTiles(m) {
     var w = m.weatherNow;
-
-    var main = h.state === 'closed'
-      ? '<div class="stat"><div class="stat-n ink" style="font-size:25px;letter-spacing:-.9px;' +
-          'line-height:1.35">' + h.headline + '</div></div>'
-      : '<div class="stat"><div class="stat-n">' + h.minutes + '</div>' +
-        '<div class="stat-u">분</div></div>';
-
-    var cap = (h.kicker ? h.kicker + ' · ' : '') + h.why;
-
-    var duo = '<div class="duo" style="margin-top:16px">' +
-        (w ? '<div class="duo-i"><b>' + w.tempC + '</b><span>' +
-               (w.feels === w.tempC ? '기온' : '체감 ' + w.feels) + '</span></div>' : '') +
-        '<div class="duo-i"><b>' + m.windows.length + '</b><span>일조 시간</span></div>' +
-      '</div>';
-
-    var sub = h.sub
-      ? '<button class="btn-text" id="h-cta-sub">' + h.sub.label + '</button>'
-      : '';
-
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico">' + UI.ICON.sun + '</div>' +
-        '<div class="c-t">오늘의 처방<small>' + (h.when || m.dateText) + '</small></div>' +
-        '<button class="c-go" id="h-go-weekly" aria-label="주간으로">' + UI.ICON.right + '</button>' +
-      '</div>' +
-      '<div class="top-mode mode-' + m.mode.id + '" style="margin-bottom:14px">' +
-        '<span class="dot"></span>' + m.modeLabel + ' 모드</div>' +
-      main +
-      '<div class="stat-cap">' + cap + '</div>' +
-      duo +
-      sub +
-    '</div>';
+    if (!w) return '';
+    var heat = step(parseFloat(w.feels), HEAT_CUT);
+    var uv = step(+w.uvi, UV_CUT);
+    return '<section class="ha-t ha-list">' +
+      '<div class="ha-li"><span class="ha-lab">기온</span>' + levelBar(heat) +
+        '<span class="ha-li-r"><b>' + w.tempC + '</b><small>' + HEAT_WORD[heat - 1] + '</small></span></div>' +
+      '<div class="ha-li"><span class="ha-lab">자외선</span>' + levelBar(uv) +
+        '<span class="ha-li-r"><b>' + w.uvi + '</b><small>' + uvLevel(+w.uvi) + '</small></span></div>' +
+    '</section>';
   }
 
-  /* ---------- 오늘 열리는 창 ---------- */
-  function windowsCard(m) {
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico mint">🪟</div>' +
-        '<div class="c-t">오늘의 일조 시간<small>무리 없이 쬘 수 있는 시간만 골랐어요</small></div>' +
-        '<span class="pill">' + m.windows.length + '개</span>' +
-      '</div>' +
-      '<div class="win-list">' +
-        m.windows.map(function (w) {
-          return '<button class="win-item' + (w.best ? ' best' : '') + '" data-win="' + w.index + '">' +
-            '<div class="win-rank">' + (w.active ? '지금' : w.index + 1) + '</div>' +
-            '<div class="lrow-b"><div class="win-time">' + w.timeText + '</div>' +
-                 '<div class="win-meta">' + w.meta +
-                 (w.cappedNote ? '<br><span style="color:#F0475B;font-weight:700">' +
-                    w.cappedNote + '</span>' : '') +
-                 '</div></div>' +
-            '<div class="win-min">' + w.minutes + '<small>분</small></div>' +
-          '</button>';
-        }).join('') +
-      '</div></div>';
-  }
-
-  /* ---------- 창이 없는 날의 대체 수단 ---------- */
-  function gapCard(m) {
-    var g = m.gap;
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico warm">🍽️</div>' +
-        '<div class="c-t">' + g.title + '<small>' + g.subtitle + '</small></div>' +
-      '</div>' +
-      '<div class="sec-desc" style="margin-bottom:12px">' + g.note + '</div>' +
-      foodGroups(g) +
-      (g.showSupplementWarning
-        ? '<div class="card warn" style="margin-top:12px"><div class="card-t">⚠️ 합산 상한 주의</div>' +
-          '<div class="card-b">' + g.supplementWarning + '</div></div>'
-        : '') +
-    '</div>';
-  }
-
-  /* 비타민D가 든 음식 — 한 번에 다 펴면 카드가 길어져 읽기 어렵다.
-     분류를 골라 그 분류만 보게 한다. 고른 분류는 화면을 다시 그려도 유지된다. */
-  var foodTab = 0;
-
-  function foodGroups(g) {
-    if (foodTab >= g.foods.length) foodTab = 0;
-    return '<div class="fseg" id="h-fseg">' +
-        g.foods.map(function (grp, i) {
-          return '<button class="fseg-b' + (i === foodTab ? ' on' : '') + '" data-fg="' + i + '">' +
-                 grp.group + '<span>' + grp.items.length + '</span></button>';
-        }).join('') +
-      '</div>' +
-      '<div id="h-fbody">' + foodBody(g) + '</div>' +
-      '<div class="fnote">' + g.foodsCaveat + '</div>';
-  }
-
-  /* 고른 분류 하나만 그린다. 함량이 특히 높은 것은 파란 칩으로 구분한다
-     (정확한 IU는 적지 않는다 — 자연산·양식·조리법에 따라 몇 배씩 갈리기 때문). */
-  function foodBody(g) {
-    var grp = g.foods[foodTab] || g.foods[0];
-    return (grp.note ? '<div class="fgroup-n">' + grp.note + '</div>' : '') +
-      '<div class="fchips">' +
-        grp.items.map(function (f) {
-          return '<span class="fchip' + (f.top ? ' top' : '') + '">' +
-            '<em>' + f.emoji + '</em>' + f.name + '</span>';
-        }).join('') +
-      '</div>';
+  /* ---------- 시간대가 여러 개일 때만 ---------- */
+  function slotsCard(m) {
+    return '<section class="ha-t ha-slots">' +
+      '<div class="ha-lab" style="margin-bottom:10px">오늘 쬘 수 있는 시간</div>' +
+      m.windows.map(function (w) {
+        var badge = w.active ? '<i class="now">지금</i>' : (w.best ? '<i>추천</i>' : '');
+        return '<button class="ha-slot" data-win="' + w.index + '">' +
+          '<span class="ha-slot-ic">' + tf(w.active ? '🏃' : '☀️') + '</span>' +
+          '<span class="ha-slot-b"><b>' + w.timeText + badge + '</b><small>' + (w.cappedNote || w.recommendText) + '</small></span>' +
+          '<span class="ha-slot-v">' + w.minutes + '분</span>' +
+        '</button>';
+      }).join('') +
+    '</section>';
   }
 
   /* ---------- 이벤트 ---------- */
@@ -212,9 +184,7 @@ var HomeView = (function () {
     };
 
     if (q('h-bell')) q('h-bell').onclick = function () { App.enableNotify(); };
-    if (q('h-loc')) q('h-loc').onclick = function () { App.go('settings'); };
-    if (q('h-evi')) q('h-evi').onclick = function () { SettingsView.evidenceSheet(); };
-    if (q('h-go-weekly')) q('h-go-weekly').onclick = function () { App.go('weekly'); };
+    if (q('h-go-weekly')) q('h-go-weekly').onclick = function () { WeeklyView.open('analysis'); };
 
     if (q('h-cta')) q('h-cta').onclick = function () {
       if (m.hero.cta.action === 'timer') App.startTimer(m.rx.activeWindow || m.rx.targetWindow);
@@ -224,18 +194,7 @@ var HomeView = (function () {
       App.startTimer(m.rx.targetWindow);
     };
     if (q('h-cta-time')) q('h-cta-time').onclick = function () { App.go('timer'); };
-
-    if (m.gap) {
-      [].forEach.call(el.querySelectorAll('[data-fg]'), function (b) {
-        b.onclick = function () {
-          foodTab = +b.dataset.fg;
-          [].forEach.call(el.querySelectorAll('[data-fg]'), function (x) {
-            x.classList.toggle('on', +x.dataset.fg === foodTab);
-          });
-          document.getElementById('h-fbody').innerHTML = foodBody(m.gap);
-        };
-      });
-    }
+    if (q('h-cta-tomorrow')) q('h-cta-tomorrow').onclick = function () { App.enableNotify(); };
 
     [].forEach.call(el.querySelectorAll('[data-win]'), function (b) {
       b.onclick = function () { App.startTimer(m.rx.windows[+b.dataset.win]); };

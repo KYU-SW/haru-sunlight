@@ -45,7 +45,7 @@ var WeeklyService = (function () {
           count: rx.windows.length,
           bestText: rx.windows.length
             ? UI.hm(rx.windows[0].recommendStart) + ' · ' + rx.windows[0].recommendMinutes + '분'
-            : '창 없음',
+            : '쉬는 날',
           minutes: rx.windows.length ? rx.windows[0].recommendMinutes : 0
         };
       });

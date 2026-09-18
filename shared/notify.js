@@ -40,12 +40,12 @@ var Notify = (function () {
       t.setHours(0, 0, 0, 0);
       var fireAt = t.getTime() + (w.recommendStart - LEAD_MIN) * 60000;
       if (fireAt <= nowMs) return;
-      var best = i === 0 && rx.windows.length > 1 ? ', 오늘 제일 좋은 창입니다'
-               : rx.windows.length === 1 ? ', 오늘 유일한 창입니다' : '';
+      var best = i === 0 && rx.windows.length > 1 ? ', 오늘 제일 좋은 시간이에요'
+               : rx.windows.length === 1 ? ', 오늘 유일한 시간이에요' : '';
       var delay = fireAt - nowMs;
       if (delay > 2147483000) return;                 // setTimeout 상한
       timers.push(setTimeout(function () {
-        fire('곧 창이 열려요',
+        fire('곧 햇빛 시간이에요',
              UI.hm(w.recommendStart) + '부터 ' + w.recommendMinutes + '분' + best);
       }, delay));
       n++;

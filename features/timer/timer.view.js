@@ -41,7 +41,7 @@ var TimerView = (function () {
       '<div class="hdr">' +
         '<div class="hdr-l">' +
           '<div class="hdr-t">노출 타이머</div>' +
-          '<div class="hdr-d">' + (running ? '지금 쬐는 중이에요' : '차림을 바꾸면 즉시 다시 계산돼요') + '</div>' +
+          (running ? '<div class="hdr-d">지금 쬐는 중이에요</div>' : '') +
         '</div>' +
         '<div class="hdr-acts">' +
           '<button class="iconbtn" id="t-home" aria-label="홈으로">' + UI.ICON.back + '</button>' +
@@ -86,14 +86,7 @@ var TimerView = (function () {
         '<button class="btn btn-primary" id="t-done">다 채웠어요</button>' +
       '</div>' +
 
-      gearSec() +
-
-      '<div class="sec">' +
-        '<div class="card"><div class="card-t">🔁 중간에 바꿔도 됩니다</div>' +
-          '<div class="card-b">옷차림을 바꾸면 남은 시간이 즉시 다시 계산됩니다. ' +
-          '지나간 시간은 그때의 조건으로 이미 적립돼 있어요.</div>' +
-        '</div>' +
-      '</div>';
+      gearSec();
 
     bind();
   }
@@ -102,18 +95,18 @@ var TimerView = (function () {
     if (running) return s.limitLabel + ' 기준 남은 시간';
     if (!p || !isFinite(p.minutes)) return '지금은 나가도 효과가 없어요';
     if (rx && rx.activeWindow) return '지금 나가면 필요한 시간';
-    if (rx && rx.targetWindow) return '다음 창에서 필요한 시간';
-    if (rx && rx.tomorrow && rx.tomorrow.window) return '내일 창에서 필요한 시간';
-    return '다음 창에서 필요한 시간';
+    if (rx && rx.targetWindow) return '다음에 쬘 시간';
+    if (rx && rx.tomorrow && rx.tomorrow.window) return '내일 쬘 시간';
+    return '다음에 쬘 시간';
   }
 
   function chargeHint(w) {
     if (!rx) return '';
-    if (rx.activeWindow) return '창은 ' + UI.hm(rx.activeWindow.end) + '까지';
+    if (rx.activeWindow) return '햇빛 시간은 ' + UI.hm(rx.activeWindow.end) + '까지';
     if (w) return UI.hmk(w.recommendStart) + '부터 열려요';
     if (rx.tomorrow && rx.tomorrow.window)
-      return '오늘은 창이 없어요 · 내일 ' + UI.hmk(rx.tomorrow.window.recommendStart) + '부터';
-    return '오늘은 열린 창이 없어요';
+      return '오늘은 햇빛 시간이 없어요 · 내일 ' + UI.hmk(rx.tomorrow.window.recommendStart) + '부터';
+    return '오늘은 햇빛 시간이 없어요';
   }
 
   /* ---------- 옷차림 (즉시 반영) ---------- */
@@ -122,7 +115,7 @@ var TimerView = (function () {
     return '<div class="sec">' +
       '<div class="c-head">' +
         '<div class="c-ico">👕</div>' +
-        '<div class="c-t">지금 차림<small>바꾸면 바로 다시 계산됩니다</small></div>' +
+        '<div class="c-t">지금 차림</div>' +
       '</div>' +
       '<div class="seg" id="t-cloth">' +
         Object.keys(Engine.CLOTHING).map(function (k) {
@@ -137,7 +130,7 @@ var TimerView = (function () {
     var q = function (id) { return document.getElementById(id); };
 
     if (q('t-home')) q('t-home').onclick = function () { App.go('home'); };
-    if (q('t-week')) q('t-week').onclick = function () { App.go('weekly'); };
+    if (q('t-week')) q('t-week').onclick = function () { WeeklyView.open('analysis'); };
 
     q('t-start').onclick = function () {
       if (!rx) return UI.toast('예보를 불러오는 중이에요');

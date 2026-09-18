@@ -100,7 +100,8 @@ var App = (function () {
      그 화면이 실제로 보인다(안 그러면 콘텐츠는 그려지는데 숨겨진 채로 남는다). */
   function applyActiveTab(tab) {
     [].forEach.call(document.querySelectorAll('.tab'), function (t) {
-      t.classList.toggle('on', t.dataset.tab === tab);
+      /* 분석(weekly)은 마이페이지의 하위 화면이라 마이페이지 탭을 켜 둔다 */
+      t.classList.toggle('on', t.dataset.tab === (tab === 'weekly' ? 'settings' : tab));
     });
     [].forEach.call(document.querySelectorAll('.screen'), function (s) {
       s.classList.toggle('active', s.id === 'screen-' + tab);
@@ -160,7 +161,7 @@ var App = (function () {
       invalidate();
       if (ok) {
         var n = Notify.schedule(prescription());
-        UI.toast(n ? '창 ' + n + '개에 15분 전 알림을 걸었어요' : '오늘 남은 창이 없어요');
+        UI.toast(n ? '햇빛 시간 ' + n + '번, 15분 전에 알려드릴게요' : '오늘 남은 햇빛 시간이 없어요');
       } else {
         UI.toast('브라우저에서 알림이 차단돼 있어요');
       }

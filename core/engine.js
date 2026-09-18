@@ -209,8 +209,8 @@ var Engine = (function () {
       var am = ctx.windows.filter(function (w) { return w.recommendStart < 12 * 60; });
       return {
         id: 'heat', label: '폭염',
-        reason: '오늘 최고 체감온도 ' + ctx.maxHeatIndexC.toFixed(0) + '℃ — 정오·오후 창은 닫았습니다',
-        headline: am.length ? '오전 창만 열어 뒀어요' : '오늘은 안 나가는 게 낫습니다',
+        reason: '오늘 최고 체감온도 ' + ctx.maxHeatIndexC.toFixed(0) + '℃ — 정오·오후에는 나가지 마세요',
+        headline: am.length ? '오전에만 나가요' : '오늘은 안 나가는 게 낫습니다',
         windows: am
       };
     }
@@ -224,8 +224,8 @@ var Engine = (function () {
     }
     return {
       id: 'normal', label: '평상',
-      reason: '전 시간대 개방 · 효율이 가장 좋은 창부터 보여드립니다',
-      headline: '오늘 이 창이 제일 좋아요',
+      reason: '효율이 가장 좋은 시간부터 보여드려요',
+      headline: '오늘 이 시간이 제일 좋아요',
       windows: ctx.windows
     };
   }

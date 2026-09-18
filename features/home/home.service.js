@@ -148,11 +148,11 @@ var HomeService = (function () {
       minutes: null,
       passed: passed,
       noDaytime: noDaytime,
-      headline: passed ? '오늘 창은 이미 지났어요'
+      headline: passed ? '오늘 햇빛 시간은 지났어요'
               : noDaytime ? (rx.isNightNow ? '오늘은 해가 졌어요' : '오늘 낮 예보가 없어요')
               : rx.mode.headline,
       why: passed
-        ? '마지막 창이 ' + UI.hm(rx.windows[rx.windows.length - 1].end) + '에 닫혔습니다'
+        ? '마지막 햇빛 시간이 ' + UI.hm(rx.windows[rx.windows.length - 1].end) + '에 끝났어요'
         : noDaytime
         ? (rx.isNightNow
             ? '일몰 뒤에는 UVB가 도달하지 않습니다 · 기상청 예보도 밤 시간만 남았어요'
@@ -171,9 +171,9 @@ var HomeService = (function () {
     var t = rx.tomorrow;
     if (t.window) {
       return '내일은 ' + UI.hmk(t.window.recommendStart) + '부터 ' +
-             t.window.recommendMinutes + '분 창이 열려요';
+             t.window.recommendMinutes + '분 쬘 수 있어요';
     }
-    return '내일도 창이 없어요 · ' + t.rx.mode.label + ' 예보';
+    return '내일도 햇빛 시간이 없어요 · ' + t.rx.mode.label + ' 예보';
   }
 
   /* 상단 날씨 한 줄 — 카드나 칩 없이 조용히 붙는다 */
@@ -287,7 +287,7 @@ var HomeService = (function () {
       body: hasWindow
         ? '심부체온 최저점은 <b>' + UI.hm(c.tmin) + '</b>. 그 이후에 빛을 보면 위상이 앞당겨져 밤에 일찍 졸립니다. ' +
           '<b>' + UI.hm(c.avoidStart) + '</b>부터 취침까지는 밝은 빛을 피하세요.'
-        : '오늘은 비타민D 창이 없지만 <b>생체리듬은 창가에서 리셋됩니다.</b> ' +
+        : '오늘은 비타민D를 만들 햇빛이 없지만 <b>생체리듬은 창가에서 리셋됩니다.</b> ' +
           'UVB(290~315nm)는 유리에 막혀도 청색광(~460nm)은 통과하기 때문이에요. ' +
           '기상 후 <b>' + UI.hm(c.tmin) + '</b> 이후 창가에서 10~20분이면 충분합니다.'
     };

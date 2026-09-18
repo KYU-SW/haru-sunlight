@@ -1,249 +1,123 @@
 /* =========================================================
-   기능: 주간 — 뷰(화면)
+   기능: 내 햇빛 분석(주간) — 뷰(화면)
 
-   레퍼런스의 두 번째 화면 구조를 따른다.
-     제목 + 원형 버튼 → 알약 세그먼트 → 큰 수치 카드(막대+말풍선) → 2열 도넛 타일 → 리스트
-   세그먼트는 장식이 아니라 실제로 아래 묶음을 갈아 끼운다.
-   내용은 그대로다 — 홈에서 옮겨 온 그래프·생체리듬이 여기 들어 있다.
+   하단 탭에서 빼고 마이페이지 → '내 햇빛 분석'으로 들어오는 하위 화면이다.
+   세그먼트로 쪼개지 않고 한 화면에 중요도 순으로 쌓는다.
+     이번 주 분석: 충전률(막대) → 저장량 · 누적 → 예보
+     노출 이력:   누적 · 횟수 → 이력 목록 (마이페이지의 '내 햇빛 기록'을 누르면 이쪽으로 연다)
    ========================================================= */
 var WeeklyView = (function () {
 
   var el, m;
-  var view = 'sum';                     // sum · uv · log (탭을 바꿔도 유지된다)
-  var VIEWS = [
-    { id: 'sum', label: '요약' },
-    { id: 'uv',  label: '그래프' },
-    { id: 'log', label: '기록' }
-  ];
+  var mode = 'analysis';     // analysis(이번 주 분석) · log(노출 이력) — 같은 화면을 둘로 쓴다
+
+  /* 마이페이지에서 들어올 때 어느 쪽으로 열지 정하고 연다 */
+  function open(which) {
+    mode = which === 'log' ? 'log' : 'analysis';
+    App.go('weekly');
+  }
 
   function render(model) {
     m = model;
     el = document.getElementById('screen-weekly');
-    el.innerHTML =
-      header() + segment() +
-      '<div id="w-sum"' + (view === 'sum' ? '' : ' hidden') + '>' +
-        trendCard() + tilesRow() + forecastCard() +
-      '</div>' +
-      '<div id="w-uv"' + (view === 'uv' ? '' : ' hidden') + '>' +
-        chartCard() + circadianCard() + gapDetailCard() +
-      '</div>' +
-      '<div id="w-log"' + (view === 'log' ? '' : ' hidden') + '>' +
-        logCard() +
-      '</div>';
+    el.innerHTML = mode === 'log'
+      ? header('노출 이력') +
+        '<div class="ha-wrap">' + logSummary() + logCard() + '</div>'
+      : header('이번 주 분석') +
+        '<div class="ha-wrap">' +
+          weekCard() +
+          splitCard() +
+          forecastCard() +
+        '</div>';
     bind();
   }
 
-  /* ---------- 헤더 ---------- */
-  function header() {
-    return '<div class="hdr">' +
-      '<div class="hdr-l">' +
-        '<div class="hdr-t">나의 햇빛<br>기록</div>' +
-        '<div class="hdr-d">하루 목표를 100%로 본 충전률</div>' +
-      '</div>' +
-      '<div class="hdr-acts">' +
-        '<button class="iconbtn" id="w-home" aria-label="홈으로">' + UI.ICON.home + '</button>' +
-        '<button class="iconbtn" id="w-my" aria-label="마이페이지로">' + UI.ICON.user + '</button>' +
-      '</div>' +
+  /* ---------- 머리 : 뒤로 + 제목 ---------- */
+  function header(title) {
+    return '<div class="an-head">' +
+      '<button class="an-back" id="w-back" aria-label="마이페이지로">' + UI.ICON.back + '</button>' +
+      '<div class="an-t">' + title + '</div>' +
     '</div>';
   }
 
-  function segment() {
-    return '<div class="seg seg-float">' +
-      VIEWS.map(function (v) {
-        return '<button data-v="' + v.id + '"' + (view === v.id ? ' class="on"' : '') + '>' +
-               v.label + '</button>';
-      }).join('') +
-    '</div>';
+  /* ---------- 노출 이력 머리 요약 ---------- */
+  function logSummary() {
+    return '<section class="ha-t an-split">' +
+      '<div><div class="ha-lab">이번 주 누적</div>' +
+        '<b>' + m.totalMinutes + '<small>분</small></b></div>' +
+      '<div><div class="ha-lab">나간 횟수</div>' +
+        '<b>' + m.sessions.length + '<small>회</small></b></div>' +
+    '</section>';
   }
 
-  /* ---------- 주간 추이 : 큰 수치 + 알약 막대 + 말풍선 ---------- */
-  function trendCard() {
-    /* 말풍선은 이번 주 최고치 위에 띄운다 (레퍼런스의 툴팁 위치) */
-    var peak = m.bars.reduce(function (a, b) { return b.percent > a.percent ? b : a; }, m.bars[0]);
-
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico">📊</div>' +
-        '<div class="c-t">주간 충전 추이<small>최근 7일</small></div>' +
-      '</div>' +
-      '<div class="stat"><div class="stat-n">' + m.weeklyPercent + '</div>' +
-        '<div class="stat-u">% · 주간 평균</div></div>' +
-      '<div class="pbars" style="margin-top:22px;height:172px">' +
+  /* ---------- 이번 주 충전률 : 큰 수치 + 7일 막대 (오늘만 파랑) ---------- */
+  function weekCard() {
+    return '<section class="ha-t an-card">' +
+      '<div class="ha-lab">이번 주 평균 충전률</div>' +
+      '<div class="an-big">' + m.weeklyPercent + '<small>%</small></div>' +
+      '<div class="an-bars">' +
         m.bars.map(function (b) {
-          var top = (b === peak && b.percent > 0)
-            ? '<div class="tipwrap"><div class="tip">' + b.percent + '%</div>' +
-              '<div class="tip-stem"></div><div class="tip-dot"></div></div>'
-            : '';
-          var cls = b.percent ? (b.isToday ? ' on' : '') : ' mute';
-          return '<div class="pbar-c' + (b.isToday ? ' today' : '') + '">' + top +
-            '<div class="pbar' + cls + '" style="height:' + Math.max(14, b.height) + '%;' +
-              'min-height:34px;padding-top:9px">' +
-              (b.percent ? '<b>' + b.percent + '</b>' : '') +
-            '</div>' +
-            '<div class="pbar-x">' + b.label + '</div>' +
+          var h = b.percent ? Math.max(10, b.height) : 4;
+          return '<div class="an-bar' + (b.isToday ? ' today' : '') + '">' +
+            '<span class="an-bar-v">' + (b.percent ? b.percent : '') + '</span>' +
+            '<i style="height:' + h + '%"></i>' +
+            '<span class="an-bar-x">' + b.label + '</span>' +
           '</div>';
         }).join('') +
-      '</div></div>';
+      '</div>' +
+    '</section>';
   }
 
-  /* ---------- 2열 도넛 타일 ---------- */
-  function tilesRow() {
-    var store = '<div class="sec">' +
-      '<div class="c-head" style="margin-bottom:10px">' +
-        '<div class="c-ico mint">🫙</div>' +
-        '<div class="c-t" style="font-size:14.5px">체내 저장량</div>' +
-      '</div>' +
-      Chart.donut(m.bodyStore, {
-        size: 124, stroke: 14,
-        center: '<div class="donut-n">' + m.bodyStore + '<small>%</small></div>' +
-                '<div class="donut-l">반감기 ' + m.halfLife + '일</div>'
-      }) +
-      '<div class="gauge-cap" style="text-align:center">' +
-        (m.missDays > 0 ? '창 없는 날 ' + m.missDays + '일째' : '꾸준히 채우는 중') +
-      '</div></div>';
-
-    var total = '<div class="sec">' +
-      '<div class="c-head" style="margin-bottom:10px">' +
-        '<div class="c-ico plum">⏱️</div>' +
-        '<div class="c-t" style="font-size:14.5px">주간 충전률</div>' +
-      '</div>' +
-      Chart.donut(Math.min(100, m.weeklyPercent), {
-        size: 124, stroke: 14, color: '#7C5CFC',
-        center: '<div class="donut-n">' + m.weeklyPercent + '<small>%</small></div>' +
-                '<div class="donut-l">누적 ' + m.totalMinutes + '분</div>'
-      }) +
-      '<div class="gauge-cap" style="text-align:center">기록 ' + m.sessions.length + '회</div>' +
-    '</div>';
-
-    return '<div class="grid2">' + store + total + '</div>';
+  /* ---------- 체내 저장량 | 누적 시간 ---------- */
+  function splitCard() {
+    return '<section class="ha-t an-split">' +
+      '<div><div class="ha-lab">체내 저장량</div>' +
+        '<b>' + m.bodyStore + '<small>%</small></b>' +
+        '<span>' + (m.missDays > 0 ? '햇빛 못 쬔 날 ' + m.missDays + '일째' : '반감기 ' + m.halfLife + '일') + '</span></div>' +
+      '<div><div class="ha-lab">이번 주 누적</div>' +
+        '<b>' + m.totalMinutes + '<small>분</small></b>' +
+        '<span>기록 ' + m.sessions.length + '회</span></div>' +
+    '</section>';
   }
 
-  /* ---------- 예보 ---------- */
+  /* ---------- 예보로 본 햇빛 창 ---------- */
   function forecastCard() {
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico warm">🗓️</div>' +
-        '<div class="c-t">' + (m.forecast.length > 1 ? '앞으로 ' + m.forecast.length + '일' : '오늘 예보') +
-          '<small>' + (m.forecast.length > 1
-            ? '기상청 단기예보 기준으로 창이 열리는 날'
-            : '단기예보가 오늘치만 도착했어요') + '</small></div>' +
-      '</div>' +
-      '<div class="win-list">' +
-        (m.forecast.length ? m.forecast.map(function (f) {
-          return '<div class="win-item' + (f.isToday ? ' best' : '') + '">' +
-            '<div class="win-rank" style="font-size:11px">' + f.label.split(' ')[1] + '</div>' +
-            '<div class="lrow-b"><div class="win-time">' + f.label.split(' ')[0] + ' · ' + f.bestText + '</div>' +
-                 '<div class="win-meta">' + f.mode.label + ' 모드 · 창 ' + f.count + '개</div></div>' +
-            '<div class="win-min">' + (f.minutes || '—') + (f.minutes ? '<small>분</small>' : '') + '</div>' +
+    if (!m.forecast.length) return '';
+    return '<section class="ha-t an-card">' +
+      '<div class="ha-lab">' + (m.forecast.length > 1 ? '앞으로 ' + m.forecast.length + '일' : '오늘 예보') + '</div>' +
+      '<div class="an-list">' +
+        m.forecast.map(function (f) {
+          var parts = f.label.split(' ');
+          return '<div class="an-row' + (f.isToday ? ' on' : '') + '">' +
+            '<span class="an-row-d"><b>' + parts[0] + '</b>' + (parts[1] || '') + '</span>' +
+            '<span class="an-row-m">' + f.bestText + '</span>' +
+            '<span class="an-row-v">' + (f.minutes ? f.minutes + '분' : '—') + '</span>' +
           '</div>';
-        }).join('') : '<div class="empty">예보를 불러오지 못했어요</div>') +
-      '</div></div>';
-  }
-
-  /* ---------- 홈에서 옮겨 온 시간별 그래프 ---------- */
-  function chartCard() {
-    var d = m.detail;
-    if (!d) return '<div class="sec"><div class="empty">예보를 불러오지 못했어요</div></div>';
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico">☀️</div>' +
-        '<div class="c-t">오늘 시간별 날씨<small>파란 띠가 나갈 수 있는 구간</small></div>' +
-      '</div>' +
-      '<div class="chart-wrap">' +
-        '<div class="chart-legend">' +
-          '<i><b style="background:#2B63F6"></b>나갈 수 있는 정도</i>' +
-          '<i><b style="background:#F59E0B"></b>기온</i>' +
-        '</div>' + d.chart +
-      '</div>' +
-      '<div class="sun-line">' +
-        '<span>일출 <b>' + d.sun.rise + '</b> · 일몰 <b>' + d.sun.set + '</b></span>' +
-        '<span>남중 <b>' + d.solarNoonText + '</b> · 최대고도 <b>' + d.maxAltText + '</b></span>' +
-      '</div>' +
-    '</div>';
-  }
-
-  /* ---------- 홈에서 옮겨 온 §6 생체리듬 ---------- */
-  function circadianCard() {
-    var c = m.detail && m.detail.circadian;
-    if (!c) return '';
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico plum">🌗</div>' +
-        '<div class="c-t">생체리듬<small>햇빛의 두 번째 축 · 비타민D와 파장이 달라요</small></div>' +
-      '</div>' +
-      '<div class="card' + (c.indoorHint ? ' info' : '') + '">' +
-        '<div class="card-t">심부체온 최저점 ' + c.tminText + '</div>' +
-        '<div class="card-b">' + c.body + '</div>' +
-      '</div>' +
-      (c.phaseLabel
-        ? '<div class="card"><div class="card-t">⏱️ 오늘 권장 시점의 효과</div>' +
-          '<div class="card-b">' + c.phaseLabel + '</div></div>'
-        : '') +
-      '<div class="card"><div class="card-t">🚫 빛 회피 창</div>' +
-        '<div class="card-b"><b>' + c.avoidText + '</b>부터 취침 전까지는 밝은 빛을 줄이세요. ' +
-        '기상 ' + c.wakeText + ' 기준 16시간 후입니다.</div></div>' +
-    '</div>';
-  }
-
-  /* ---------- 홈에서 옮겨 온 §5 상세 — 공식 섭취기준 (창이 없는 날만) ---------- */
-  function gapDetailCard() {
-    var g = m.detail && m.detail.gap;
-    if (!g) return '';
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico warm">💊</div>' +
-        '<div class="c-t">보충제를 고려할 구간<small>용량은 정해 드리지 않습니다 · 공식 기준만</small></div>' +
-      '</div>' +
-      '<dl class="official" style="margin-top:0">' +
-        '<dt>비타민D 섭취 기준</dt>' +
-        g.official.rows.map(function (r) {
-          return '<dd><span>' + r.k + '</span><b>' + r.v + '</b></dd>';
         }).join('') +
-        '<div class="src">출처 · ' + g.official.source + '</div>' +
-      '</dl></div>';
+      '</div>' +
+    '</section>';
   }
 
   /* ---------- 노출 이력 ---------- */
   function logCard() {
-    return '<div class="sec">' +
-      '<div class="c-head">' +
-        '<div class="c-ico">📒</div>' +
-        '<div class="c-t">노출 이력<small>누적 ' + m.totalMinutes + '분 · ' + m.sessions.length + '회</small></div>' +
-      '</div>' +
+    return '<section class="ha-t an-card">' +
       (m.sessions.length
-        ? m.sessions.map(function (s) {
-            return '<div class="log">' +
-              '<div class="log-d">' + s.dateText + '</div>' +
-              '<div class="log-t">' + s.timeText + ' · ' + s.minutes + '분' +
-                '<small>' + s.gear + ' · ' + s.limitLabel + ' 기준</small></div>' +
-              '<div class="log-p">+' + s.percent + '%</div>' +
+        ? '<div class="an-list">' + m.sessions.map(function (s) {
+            return '<div class="an-row">' +
+              '<span class="an-row-d"><b>' + s.dateText + '</b></span>' +
+              '<span class="an-row-m">' + s.timeText + ' · ' + s.minutes + '분</span>' +
+              '<span class="an-row-v blue">+' + s.percent + '%</span>' +
             '</div>';
-          }).join('')
-        : '<div class="empty"><em>🌤️</em>아직 기록이 없어요<br>타이머로 한 번 나가 보세요</div>') +
-    '</div>';
+          }).join('') + '</div>'
+        : '<div class="an-empty">아직 기록이 없어요<br>타이머로 한 번 나가 보세요</div>') +
+    '</section>';
   }
 
   /* ---------- 이벤트 ---------- */
   function bind() {
-    [].forEach.call(el.querySelectorAll('.seg button'), function (b) {
-      b.onclick = function () {
-        view = b.dataset.v;
-        [].forEach.call(el.querySelectorAll('.seg button'), function (o) {
-          o.classList.toggle('on', o.dataset.v === view);
-        });
-        ['sum', 'uv', 'log'].forEach(function (id) {
-          document.getElementById('w-' + id).hidden = (id !== view);
-        });
-        window.scrollTo(0, 0);
-        var ap = document.getElementById('app');
-        if (ap) ap.scrollTop = 0;   // 데스크톱 기기 틀에서는 #app이 스크롤된다
-      };
-    });
-    var home = document.getElementById('w-home');
-    if (home) home.onclick = function () { App.go('home'); };
-    var my = document.getElementById('w-my');
-    if (my) my.onclick = function () { App.go('settings'); };
+    var back = document.getElementById('w-back');
+    if (back) back.onclick = function () { App.go('settings'); };
   }
 
-  return { render: render };
+  return { render: render, open: open };
 })();
