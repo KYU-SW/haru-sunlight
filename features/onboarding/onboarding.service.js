@@ -15,7 +15,7 @@ var OnboardingService = (function () {
   var state = { step: 0, skinIndex: null, wakeTime: '07:00', loc: null };
 
   function steps() {
-    return ['skin', 'wake', 'location'];
+    return ['skin', 'location'];
   }
   function total() { return steps().length; }
 
@@ -31,7 +31,6 @@ var OnboardingService = (function () {
   function canNext() {
     var s = steps()[state.step];
     if (s === 'skin') return state.skinIndex !== null;
-    if (s === 'wake') return /^\d{2}:\d{2}$/.test(state.wakeTime);
     if (s === 'location') return !!state.loc;
     return true;
   }

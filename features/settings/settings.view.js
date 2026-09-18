@@ -38,9 +38,7 @@ var SettingsView = (function () {
           navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '') +
           navRow('s-body-spf', '선크림', spfLabel(p.spf))) +
 
-        group('알림 · 리듬',
-          '<div class="st-row"><span class="st-l">기상 시간</span>' +
-            '<input type="time" class="st-time" id="s-wake-in" value="' + p.wakeTime + '"></div>' +
+        group('알림',
           toggleRow('s-notify', '햇빛 알림', p.notify && m.notifyGranted)) +
 
         group('위치',
@@ -226,9 +224,6 @@ var SettingsView = (function () {
       function () { bodyInfoSheet(); };
     q('s-region').onclick = function () { regionSheet(); };
 
-    q('s-wake-in').onchange = function () {
-      SettingsService.set({ wakeTime: this.value }); after();
-    };
     q('s-notify').onclick = function () {
       if (!Notify.supported()) return UI.toast('이 브라우저는 알림을 지원하지 않아요');
       var cur = Repo.getProfile().notify && Notify.granted();

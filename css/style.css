@@ -1363,3 +1363,28 @@ html, body, #app, .phone,
 @keyframes tabFade { from { opacity:0; } to { opacity:1; } }
 @keyframes pushIn { from { opacity:0; transform:translateX(28px); } to { opacity:1; transform:none; } }
 @media (prefers-reduced-motion: reduce) { .screen, #screen-weekly { animation:none; } }
+
+/* 시작 화면 — 제목을 홈 로고와 같은 결로 (굵고 촘촘하게, 햇빛만 파랑) */
+.lg-title { font-size:42px; font-weight:900; letter-spacing:-0.07em; color:var(--ink); margin-top:22px; }
+.lg-title span { color:#326CF9; }
+.lg-sub { font-size:16.5px; font-weight:600; line-height:1.55; color:var(--ink-2); }
+.lg-note { color:var(--ink-3); font-weight:500; }
+
+
+/* =========================================================
+   온보딩 — 단계가 바뀔 때만 옆에서 천천히 들어온다(선택지를 누를 때는 그대로)
+   ========================================================= */
+.ob-body { animation:none; }
+.ob-body.enter { animation:obIn .5s cubic-bezier(.22,.8,.3,1); }
+@keyframes obIn { from { opacity:0; transform:translateX(24px); } to { opacity:1; transform:none; } }
+.ob-prog i { transition:width .6s cubic-bezier(.22,.8,.3,1); background:#326CF9; }
+.ob-q { font-weight:800; letter-spacing:-0.04em; color:var(--ink); }
+.ob-help { color:var(--ink-3); }
+.ob-step { color:#326CF9; }
+.ob-tip { margin-top:18px; padding:14px 16px; border-radius:14px; background:var(--surf);
+  font-size:13.5px; line-height:1.6; color:var(--ink-2); }
+.ob-tip b { color:var(--ink); font-weight:700; }
+.ob-picked { display:inline-block; margin-top:16px; padding:8px 14px; border-radius:99px;
+  background:#EAF0FF; color:#326CF9; font-size:15px; font-weight:700; }
+#onboarding .st-res { max-height:none; }
+@media (prefers-reduced-motion: reduce) { .ob-body.enter { animation:none; } .ob-prog i { transition:none; } }
