@@ -28,7 +28,7 @@ var WeeklyService = (function () {
         timeText: UI.hm(d.getHours() * 60 + d.getMinutes()),
         minutes: s.minutes,
         percent: s.percent,
-        gear: (Engine.CLOTHING[s.clothing] || {}).label + (s.spf > 1 ? ' · SPF ' + s.spf : ''),
+        gear: (Engine.CLOTHING[s.clothing] || {}).label,
         limitLabel: Engine.LIMIT_LABEL[s.limitedBy] || ''
       };
     });

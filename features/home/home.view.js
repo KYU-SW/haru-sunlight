@@ -17,8 +17,9 @@ var HomeView = (function () {
     el.innerHTML =
       header(m) +
       (m.stale ? '<div class="stale">⚠️ 네트워크 연결이 안 돼 저장된 예보로 계산했어요</div>' : '') +
-      actionRow(m) +
       summaryCard(m) +
+      /* 타이머 시작 CTA — '오늘의 처방' 카드 바로 아래에 가로로 길게 둔다. */
+      ctaWide(m) +
       /* 창이 있으면 '오늘 열리는 창', 없으면 그 자리에 대체 수단이 온다.
          '무엇이 이 시간을 정했나'와 하단 이동 행들은 마이페이지로 옮겼다. */
       (m.windows.length ? windowsCard(m) : '') +
@@ -39,36 +40,38 @@ var HomeView = (function () {
         '<div class="hdr-d">' + UI.esc(m.loc.name) + ' · ' + dateShort + '</div>' +
       '</div>' +
       '<div class="hdr-acts">' +
+        '<button class="iconbtn" id="h-loc" aria-label="지역 바꾸기">' + UI.ICON.pin + '</button>' +
+        '<button class="iconbtn" id="h-evi" aria-label="계산 근거 보기">' + UI.ICON.sliders + '</button>' +
         '<button class="iconbtn" id="h-bell" aria-label="알림">' + UI.ICON.bell +
           (notifyOn ? '<span class="dot"></span>' : '') + '</button>' +
-        '<button class="iconbtn" id="h-refresh" aria-label="날씨·자외선 새로고침">' +
+        '<button class="iconbtn" id="h-refresh" aria-label="날씨 새로고침">' +
           UI.ICON.refresh + '</button>' +
       '</div>' +
     '</div>';
   }
 
-  /* ---------- 액션 행 : 원형 버튼 + 파란 알약 CTA ---------- */
-  function actionRow(m) {
+  /* ---------- 타이머 시작 CTA : '오늘의 처방' 카드 아래에 가로로 길게 ----------
+     예전엔 이 버튼이 원형 버튼들과 한 줄에 있는 파란 알약이었다.
+     이제 오늘의 처방(summaryCard) 바로 밑에 화면 너비만큼 길게 배치해
+     '지금 무엇을 해야 하는지'가 처방 다음 동작으로 바로 이어지게 한다. */
+  function ctaWide(m) {
     var h = m.hero;
     var cta;
     if (h.cta) {
-      cta = '<button class="act-cta" id="h-cta">' +
+      cta = '<button class="act-cta wide" id="h-cta">' +
               (h.cta.action === 'timer' ? UI.ICON.play : UI.ICON.bell) + h.cta.label + '</button>';
     } else if (h.passed) {
-      cta = '<button class="act-cta" id="h-cta-tomorrow">' + UI.ICON.bell + '내일 창 알림 받기</button>';
+      /* 오늘 햇빛 쬘 수 있는 시간이 이미 다 지났다 — 더 할 수 있는 행동이 없으니
+         버튼 자체를 아예 띄우지 않는다(내일 다시 열린다는 안내는 summaryCard에 있다). */
+      return '';
     } else {
       /* 예전엔 '대체 수단 보기'가 아래 음식 카드로 스크롤만 해서
          무엇을 하는 버튼인지 알기 어려웠다. 이제 타이머로 보내
          '얼마나 나가야 하는지'를 직접 보여 준다(오늘 창이 없으면 내일 창 기준). */
-      cta = '<button class="act-cta" id="h-cta-time">' + UI.ICON.timer +
+      cta = '<button class="act-cta wide" id="h-cta-time">' + UI.ICON.timer +
             '나가야 할 시간 보기</button>';
     }
-
-    return '<div class="actrow">' +
-      '<button class="act-c" id="h-loc" aria-label="지역 바꾸기">' + UI.ICON.pin + '</button>' +
-      '<button class="act-c" id="h-evi" aria-label="계산 근거 보기">' + UI.ICON.sliders + '</button>' +
-      cta +
-    '</div>';
+    return '<div class="cta-wrap">' + cta + '</div>';
   }
 
   /* ---------- 요약 카드 : 큰 수치 + 알약 막대 ---------- */
@@ -85,10 +88,9 @@ var HomeView = (function () {
     var cap = (h.kicker ? h.kicker + ' · ' : '') + h.why;
 
     var duo = '<div class="duo" style="margin-top:16px">' +
-        (w ? '<div class="duo-i"><b>' + w.uvi + '</b><span>자외선지수</span></div>' +
-             '<div class="duo-i"><b>' + w.tempC + '</b><span>' +
+        (w ? '<div class="duo-i"><b>' + w.tempC + '</b><span>' +
                (w.feels === w.tempC ? '기온' : '체감 ' + w.feels) + '</span></div>' : '') +
-        '<div class="duo-i"><b>' + m.windows.length + '</b><span>열리는 창</span></div>' +
+        '<div class="duo-i"><b>' + m.windows.length + '</b><span>일조 시간</span></div>' +
       '</div>';
 
     var sub = h.sub
@@ -115,7 +117,7 @@ var HomeView = (function () {
     return '<div class="sec">' +
       '<div class="c-head">' +
         '<div class="c-ico mint">🪟</div>' +
-        '<div class="c-t">오늘 열리는 창<small>고도 45°↑ · 열 안전 통과 · 60분 이하</small></div>' +
+        '<div class="c-t">오늘의 일조 시간<small>무리 없이 쬘 수 있는 시간만 골랐어요</small></div>' +
         '<span class="pill">' + m.windows.length + '개</span>' +
       '</div>' +
       '<div class="win-list">' +
@@ -198,9 +200,8 @@ var HomeView = (function () {
           return;
         }
         var t = new Date(res.data.fetchedAt);
-        var uv = res.data.uvMissing ? '자외선지수 누락' : '자외선지수 반영';
         UI.toast('최신 예보로 새로고침했어요 · ' +
-                 UI.hm(t.getHours() * 60 + t.getMinutes()) + ' 기준 · ' + uv);
+                 UI.hm(t.getHours() * 60 + t.getMinutes()) + ' 기준');
       }).catch(function () {
         /* 실패 토스트는 App.refresh가 이미 띄운다 */
       }).then(function () {
@@ -222,7 +223,6 @@ var HomeView = (function () {
     if (q('h-cta-sub')) q('h-cta-sub').onclick = function () {
       App.startTimer(m.rx.targetWindow);
     };
-    if (q('h-cta-tomorrow')) q('h-cta-tomorrow').onclick = function () { App.enableNotify(); };
     if (q('h-cta-time')) q('h-cta-time').onclick = function () { App.go('timer'); };
 
     if (m.gap) {

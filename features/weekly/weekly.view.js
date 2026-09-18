@@ -12,7 +12,7 @@ var WeeklyView = (function () {
   var view = 'sum';                     // sum · uv · log (탭을 바꿔도 유지된다)
   var VIEWS = [
     { id: 'sum', label: '요약' },
-    { id: 'uv',  label: '자외선' },
+    { id: 'uv',  label: '그래프' },
     { id: 'log', label: '기록' }
   ];
 
@@ -147,11 +147,11 @@ var WeeklyView = (function () {
     return '<div class="sec">' +
       '<div class="c-head">' +
         '<div class="c-ico">☀️</div>' +
-        '<div class="c-t">오늘 시간별 자외선 · 기온<small>파란 띠가 나갈 수 있는 구간</small></div>' +
+        '<div class="c-t">오늘 시간별 날씨<small>파란 띠가 나갈 수 있는 구간</small></div>' +
       '</div>' +
       '<div class="chart-wrap">' +
         '<div class="chart-legend">' +
-          '<i><b style="background:#2B63F6"></b>자외선</i>' +
+          '<i><b style="background:#2B63F6"></b>나갈 수 있는 정도</i>' +
           '<i><b style="background:#F59E0B"></b>기온</i>' +
         '</div>' + d.chart +
       '</div>' +

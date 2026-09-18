@@ -90,7 +90,7 @@ var TimerView = (function () {
 
       '<div class="sec">' +
         '<div class="card"><div class="card-t">🔁 중간에 바꿔도 됩니다</div>' +
-          '<div class="card-b">옷차림이나 자외선차단제를 바꾸면 남은 시간이 즉시 다시 계산됩니다. ' +
+          '<div class="card-b">옷차림을 바꾸면 남은 시간이 즉시 다시 계산됩니다. ' +
           '지나간 시간은 그때의 조건으로 이미 적립돼 있어요.</div>' +
         '</div>' +
       '</div>';
@@ -100,7 +100,7 @@ var TimerView = (function () {
 
   function label(running, s, p) {
     if (running) return s.limitLabel + ' 기준 남은 시간';
-    if (!p || !isFinite(p.minutes)) return '지금은 자외선이 없어요';
+    if (!p || !isFinite(p.minutes)) return '지금은 나가도 효과가 없어요';
     if (rx && rx.activeWindow) return '지금 나가면 필요한 시간';
     if (rx && rx.targetWindow) return '다음 창에서 필요한 시간';
     if (rx && rx.tomorrow && rx.tomorrow.window) return '내일 창에서 필요한 시간';
@@ -116,10 +116,9 @@ var TimerView = (function () {
     return '오늘은 열린 창이 없어요';
   }
 
-  /* ---------- 옷차림 · SPF (즉시 반영) ---------- */
+  /* ---------- 옷차림 (즉시 반영) ---------- */
   function gearSec() {
     var p = Repo.getProfile();
-    var spfs = [1, 15, 30, 50];
     return '<div class="sec">' +
       '<div class="c-head">' +
         '<div class="c-ico">👕</div>' +
@@ -129,13 +128,6 @@ var TimerView = (function () {
         Object.keys(Engine.CLOTHING).map(function (k) {
           return '<button data-c="' + k + '"' + (p.clothing === k ? ' class="on"' : '') + '>' +
                  Engine.CLOTHING[k].label + '</button>';
-        }).join('') +
-      '</div>' +
-      '<div style="height:8px"></div>' +
-      '<div class="seg" id="t-spf">' +
-        spfs.map(function (v) {
-          return '<button data-s="' + v + '"' + (+p.spf === v ? ' class="on"' : '') + '>' +
-                 (v === 1 ? '안 바름' : 'SPF ' + v) + '</button>';
         }).join('') +
       '</div></div>';
   }
@@ -164,9 +156,6 @@ var TimerView = (function () {
     [].forEach.call(el.querySelectorAll('#t-cloth button'), function (b) {
       b.onclick = function () { setGear({ clothing: b.dataset.c }); };
     });
-    [].forEach.call(el.querySelectorAll('#t-spf button'), function (b) {
-      b.onclick = function () { setGear({ spf: +b.dataset.s }); };
-    });
   }
 
   function setGear(patch) {
@@ -175,9 +164,6 @@ var TimerView = (function () {
     var p = Repo.getProfile();
     [].forEach.call(el.querySelectorAll('#t-cloth button'), function (b) {
       b.classList.toggle('on', b.dataset.c === p.clothing);
-    });
-    [].forEach.call(el.querySelectorAll('#t-spf button'), function (b) {
-      b.classList.toggle('on', +b.dataset.s === +p.spf);
     });
 
     if (TimerService.isRunning()) {
@@ -219,10 +205,9 @@ var TimerView = (function () {
   function liveText(running, s, p) {
     if (!p) return '<div class="tnote">예보를 불러오는 중이에요</div>';
 
-    var tiles = '<div class="tstats">' +
-      '<div class="tstat on"><b>' + p.uvi.toFixed(1) + '</b><span>자외선지수</span></div>' +
-      '<div class="tstat"><b>' + p.heatIndexC.toFixed(0) + '℃</b><span>체감온도</span></div>' +
-      '<div class="tstat"><b>' + p.altitude.toFixed(0) + '°</b><span>태양고도</span></div>' +
+    var tiles = '<div class="tstat-duo">' +
+      '<div class="tstat-duo-i"><b>' + p.heatIndexC.toFixed(0) + '℃</b><span>체감온도</span></div>' +
+      '<div class="tstat-duo-i"><b>' + p.altitude.toFixed(0) + '°</b><span>태양고도</span></div>' +
     '</div>';
 
     var body = '이 조건에서 필요한 시간 <b>' + UI.mins(p.vitd) + '</b>' +

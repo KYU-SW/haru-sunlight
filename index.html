@@ -27,14 +27,10 @@
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5L12 3l9 7.5"/><path d="M5 9.5V20h14V9.5"/></svg>
       <span class="sr">홈</span>
     </button>
-    <button class="tab" data-tab="timer" aria-label="타이머">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6"/></svg>
-      <span class="sr">타이머</span>
-    </button>
-    <button class="tab" data-tab="weekly" aria-label="주간">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 20V11M12 20V4M19 20v-6"/></svg>
-      <span class="sr">주간</span>
-    </button>
+    <!-- 타이머는 하단 탭으로 직접 들어갈 수 없다 — 홈 화면의 타이머 시작 CTA를 눌러야만
+         진입하도록 의도적으로 뺐다(App.startTimer가 go('timer')를 호출).
+         나의 햇빛 기록(주간)도 마찬가지로 하단 탭에서 뺐다 — 마이페이지의
+         '생체리듬 자세히' 카드를 눌러야만 들어갈 수 있게 의도적으로 뺐다. -->
     <button class="tab" data-tab="settings" aria-label="마이페이지">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.6"/><path d="M4.5 20c0-4 3.4-6 7.5-6s7.5 2 7.5 6"/></svg>
       <span class="sr">마이페이지</span>

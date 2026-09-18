@@ -217,7 +217,7 @@ var Engine = (function () {
     if (ctx.windows.length === 0) {
       return {
         id: 'cloudy', label: '장마 · 흐림',
-        reason: '자외선이 약해 오늘 열리는 창이 없습니다',
+        reason: '날씨가 흐려 오늘 일조 시간이 없습니다',
         headline: '오늘은 무리예요',
         windows: []
       };

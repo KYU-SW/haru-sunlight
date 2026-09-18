@@ -71,7 +71,7 @@ var Chart = (function () {
       var mx = x(rx.targetWindow.recommendStart);
       var my = uvY(rx.targetWindow.best.uvi);
       if (mx >= 0 && mx <= W) {
-        var lab = 'UVI ' + rx.targetWindow.best.uvi.toFixed(1);
+        var lab = '추천 ' + UI.hm(rx.targetWindow.recommendStart);
         var lw = lab.length * 6.2 + 14;                     // 글자 수로 말풍선 너비를 잡는다
         var lx = Math.min(W - lw / 2, Math.max(lw / 2, mx)); // 그래프 밖으로 나가지 않게
         var ly = Math.max(16, my - 26);
@@ -99,8 +99,7 @@ var Chart = (function () {
         '<path d="' + line + '" fill="none" stroke="#2B63F6" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>' +
         nowLine + mark +
       '</svg>' +
-      '<div style="display:flex;justify-content:space-between;padding:6px 2px 0;font-size:11px;color:#8A96AA;font-weight:600">' +
-        '<span>UV 최대 ' + uvMax + '</span>' +
+      '<div style="display:flex;justify-content:center;padding:6px 2px 0;font-size:11px;color:#8A96AA;font-weight:600">' +
         '<span>기온 ' + Math.round(tMin) + '~' + Math.round(tMax) + '℃</span>' +
       '</div>';
   }

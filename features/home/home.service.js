@@ -209,13 +209,13 @@ var HomeService = (function () {
       {
         key: 'vitd', icon: '☀️', name: '비타민D 필요량',
         value: UI.mins(p.vitd),
-        note: 'MED ' + p.med + ' J/m² · 노출면적 ' + Math.round(p.fBSA * 100) + '% · UVI ' + p.uvi.toFixed(1),
+        note: 'MED ' + p.med + ' J/m² · 노출면적 ' + Math.round(p.fBSA * 100) + '%',
         win: !altBlocked && p.limitedBy === 'vitd'
       },
       {
         key: 'burn', icon: '🔥', name: '화상 한계',
         value: UI.mins(p.burn),
-        note: p.spf > 1 ? '자외선차단제 SPF ' + p.spf + ' 적용' : '차단제 없음(SPF 1) 기준',
+        note: '피부 타입 기준 화상 한계시간',
         win: !altBlocked && p.limitedBy === 'burn'
       },
       {
@@ -234,7 +234,7 @@ var HomeService = (function () {
         timeText: UI.hm(w.start) + ' ~ ' + UI.hm(w.end),
         recommendText: UI.hm(w.recommendStart) + ' 시작 권장',
         minutes: w.recommendMinutes,
-        meta: 'UVI ' + w.best.uvi.toFixed(1) + ' · 태양고도 ' + w.best.altitude.toFixed(0) +
+        meta: '태양고도 ' + w.best.altitude.toFixed(0) +
               '° · ' + Math.round(w.best.tempC) + '℃',
         /* 안전 한계에 잘려 목표를 못 채우는 창은 그 사실을 밝힌다 */
         capped: w.completable === false,
