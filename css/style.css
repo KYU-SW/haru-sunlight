@@ -1400,3 +1400,7 @@ html, body, #app, .phone,
 }
 .hdr { margin:0; }
 .is-scrolled .ha-head, .is-scrolled .an-head, .is-scrolled .hdr { border-bottom-color:var(--hair); }
+
+/* 토스트 — left:50% 때문에 폭이 화면 절반으로 묶여 "요"만 다음 줄로 떨어지던 문제.
+   글 길이만큼 넓히고(최대 화면 폭 − 40px), 줄이 바뀌어도 단어 단위로만 끊는다. */
+#toast { width:max-content; max-width:calc(100% - 40px); word-break:keep-all; text-align:center; }
