@@ -1,12 +1,11 @@
 @import url('https://cdn.jsdelivr.net/gh/toss/tossface/dist/tossface.css');
 /* =========================================================
-   하루 햇빛 — 디자인 시스템
-   레퍼런스: 연한 블루그레이 바탕 + 떠 있는 흰 라운드 카드,
-             원형 아이콘 버튼 + 파란 알약 CTA, 알약형 막대·도넛 게이지,
-             떠 있는 원형 하단 내비.
+   하루햇빛 — 디자인 시스템 (작업 규칙은 저장소 맨 위 CLAUDE.md)
+   글꼴 Pretendard · 색은 네이비 한 계열 + 강조 파랑(#326CF9)
+   흰 바탕 위 옅은 면(#F3F6FB) 카드 · 그림자와 그라데이션 없음
+   ※ 옛 스타일 위에 새 스타일을 덧씌운 구조라, 같은 선택자가 여러 번 나온다.
+     최종 기준은 파일 맨 아래 블록이다.
    ========================================================= */
-/* 원래 Pretendard(각진 인상)에서, 좀 더 둥글고 편안하게 읽히는 나눔고딕으로 바꿨다.
-   숫자·작은 라벨은 얇은 굵기(400)에서도 또렷하도록 tabular-nums를 그대로 쓴다. */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css');
 
 :root {
