@@ -5,30 +5,32 @@
    ========================================================= */
 var Engine = (function () {
 
-  /* ---------- §2 상수 ---------- */
-  var K = 0.4;              // 비타민D/홍반 비율 (문헌 0.3~0.5 중 중앙값)
-  var UVI_COEFF = 1.5;      // UVI → 홍반조사량(W/m²) 환산계수 (고정)
+  /* ---------- §2 상수 — 근거와 출처는 CALCULATION.md ---------- */
 
-  var MED = { 1: 150, 2: 250, 3: 300, 4: 400, 5: 500, 6: 600 }; // Fitzpatrick, J/m²
+  /* K : 하루 목표(1,000 IU)를 MED의 몇 배로 보는가.
+       곽민경·김재환(2011, 대기 21-1) — 체표면 6~10%에 0.5 MED → 비타민D 200 IU
+       → 1,000 IU = 0.5 MED × 체표면 40% → 기준 면적 32%로 환산하면 0.25
+       교차 검증: Kallioğlu 외(2024, Scientific Reports) 국제 모델은 0.20 (25% 이내 일치) */
+  var K = 0.25;
 
-  /* f_BSA(노출 피부 면적) 위치 — 분모로 확정.
+  /* UVI → 분 단위 환산계수. 자외선지수 1 = 25 mW/m² (WHO·WMO·UNEP·ICNIRP)
+     0.025 W/m² × 60초 = 1.5 */
+  var UVI_COEFF = 1.5;
 
-     명세 §2 원문은 (k × MED × f_BSA) ÷ (1.5 × UVI) 로 f_BSA가 '분자'였는데,
-     그러면 옷을 더 껴입을수록 필요시간이 짧아지는 역전이 생긴다.
-       (분자일 때)  반팔반바지 6.4분  >  긴팔긴바지 1.6분   ← 살을 가릴수록 빨리 채워짐(?)
+  /* 피부 타입별 최소홍반량(J/m²) — Kallioğlu 외(2024, Scientific Reports) 표 */
+  var MED = { 1: 200, 2: 250, 3: 300, 4: 450, 5: 600, 6: 1000 };
 
-     비타민D 총 생성량 = 조사강도 × 시간 × 노출면적 이므로,
-     같은 양을 채우려면 노출면적이 작을수록 시간이 길어져야 한다 → f_BSA는 분모.
-       (분모일 때)  반팔반바지 40분  <  긴팔긴바지 160분    ← 직관과 일치
+  /* 기준 옷차림(반팔+반바지)의 노출 면적.
+     K가 이 면적을 전제로 한 값이라, 다른 옷차림은 면적 비율만큼 시간이 늘어난다.
+     이 기준이 없으면 긴 옷차림은 아무리 오래 있어도 목표를 못 채운다. */
+  var F_REF = 0.32;
 
-     ※ §1의 "공식 통일" 대상이므로 다른 프로토타입도 같이 맞춰야 한다.
-        되돌리려면 이 한 줄만 false로 바꾸면 명세 원문 그대로 동작한다. */
-  var F_BSA_IN_DENOMINATOR = true;
-
+  /* 노출 면적 — 9의 법칙(Rule of Nines) 기준
+       얼굴·목 4.5% · 팔 아래쪽 9% · 다리 아래쪽 18% · 손 1.5% */
   var CLOTHING = {
-    shortShort: { f: 0.40, label: '반팔 + 반바지' },
-    shortLong:  { f: 0.25, label: '반팔 + 긴바지' },
-    longLong:   { f: 0.10, label: '긴팔 + 긴바지' }
+    shortShort: { f: 0.32, label: '반팔 + 반바지' },
+    shortLong:  { f: 0.14, label: '반팔 + 긴바지' },
+    longLong:   { f: 0.06, label: '긴팔 + 긴바지' }
   };
 
   var LIMIT_LABEL = {
@@ -59,9 +61,10 @@ var Engine = (function () {
     return (HI - 32) * 5 / 9;
   }
 
-  /* §3 표 — 체감온도 → 최대 노출 + 부가 지시문구 */
+  /* §3 표 — 체감온도 → 최대 노출 + 부가 지시문구
+     구간은 기상청 폭염특보 기준(체감 33℃ 주의보 · 35℃ 경보)에 맞춘다. */
   function heatCap(hiC) {
-    if (hiC < 31) return { minutes: Infinity, level: 0, note: null };
+    if (hiC < 33) return { minutes: Infinity, level: 0, note: null };
     if (hiC < 35) return { minutes: 20, level: 1, note: '물 마시고 나가세요' };
     if (hiC < 38) return { minutes: 10, level: 2, note: '모자 쓰고, 직사광선 짧게' };
     return { minutes: 0, level: 3, note: '노출 금지 — 다른 시간대로' };
@@ -71,15 +74,16 @@ var Engine = (function () {
   function computePoint(o) {
     var med  = MED[o.skinType] || MED[3];
     var fBSA = (CLOTHING[o.clothing] || CLOTHING.shortShort).f;
-    var spf  = o.spf && o.spf > 1 ? o.spf : 1;   // 안 바르면 1
     var uvi  = o.uvi > 0 ? o.uvi : 0;
 
     var denom = UVI_COEFF * uvi;
-    var vitd = denom > 0
-      ? (F_BSA_IN_DENOMINATOR ? (K * med) / (denom * fBSA)   // 물리 기준(미채택)
-                              : (K * med * fBSA) / denom)    // 명세 §2 그대로
-      : Infinity;
-    var burn = denom > 0 ? (med * spf) / denom : Infinity;
+
+    /* 비타민D : 기준 옷차림(F_REF)에서 K×MED를 받는 데 걸리는 시간.
+       노출 면적이 좁으면 그 비율만큼 오래 걸린다(생성량 = 강도 × 시간 × 면적). */
+    var vitd = denom > 0 ? (K * med * F_REF) / (denom * fBSA) : Infinity;
+
+    /* 화상 : 면적과 무관하다 — 드러난 피부 한 곳이 받는 양은 옷차림과 상관없이 같다. */
+    var burn = denom > 0 ? med / denom : Infinity;
 
     /* §3 체감온도 — 예보가 체감온도(apparent_temperature)를 직접 주면 그 값을 쓰고,
        없을 때만 기온·습도로 NOAA Heat Index를 계산한다. */
@@ -100,7 +104,7 @@ var Engine = (function () {
       uvi: uvi, uviClear: o.uviClear == null ? null : o.uviClear,
       tempC: o.tempC, rh: o.rh, feelsLike: o.feelsLike,
       heatFromForecast: (o.feelsLike != null && isFinite(o.feelsLike)),
-      med: med, fBSA: fBSA, spf: spf
+      med: med, fBSA: fBSA
     };
   }
 
@@ -205,7 +209,7 @@ var Engine = (function () {
         windows: []
       };
     }
-    if (ctx.maxHeatIndexC >= 31) {
+    if (ctx.maxHeatIndexC >= 33) {   // 기상청 폭염주의보 기준(체감 33℃)
       var am = ctx.windows.filter(function (w) { return w.recommendStart < 12 * 60; });
       return {
         id: 'heat', label: '폭염',
@@ -300,8 +304,7 @@ var Engine = (function () {
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   return {
-    K: K, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING,
-    F_BSA_IN_DENOMINATOR: F_BSA_IN_DENOMINATOR,
+    K: K, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING, F_REF: F_REF,
     HALF_LIFE_DAYS: HALF_LIFE_DAYS, LIMIT_LABEL: LIMIT_LABEL,
     heatIndex: heatIndex, heatCap: heatCap,
     computePoint: computePoint, isOpen: isOpen,

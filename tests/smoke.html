@@ -31,34 +31,34 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
 
 /* ---------- 1. 엔진 단위 검증 (§2 공식 손계산 대조) ---------- */
 log('── 1. 엔진 · §2 공식');
-var r = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 });
-ok('비타민D = (0.4×300)/(1.5×8×0.40) = 25분', near(r.vitd, 25, 0.001), '실제 ' + r.vitd.toFixed(3));
-ok('화상   = (300×1)/(1.5×8) = 25분',        near(r.burn, 25, 0.001), '실제 ' + r.burn.toFixed(3));
-ok('최종 = min(25, 25) → 화상 한계와 동률',   near(r.minutes, 25, 0.001));
+var r = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
+ok('비타민D = (0.25×300×0.32)/(1.5×8×0.32) = 6.25분', near(r.vitd, 6.25, 0.001), '실제 ' + r.vitd.toFixed(3));
+ok('화상   = 300/(1.5×8) = 25분',                      near(r.burn, 25, 0.001), '실제 ' + r.burn.toFixed(3));
+ok('최종 = min(6.25, 25) → 비타민D 기준',              near(r.minutes, 6.25, 0.001) && r.limitedBy === 'vitd');
 
-var r2 = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 6, clothing: 'longLong', spf: 30 });
-ok('피부VI+긴팔긴바지 = (0.4×600)/(12×0.10) = 200분', near(r2.vitd, 200, 0.001), '실제 ' + r2.vitd.toFixed(3));
-ok('SPF30 화상한계 = (600×30)/12 = 1500분',       near(r2.burn, 1500, 0.01));
+var r2 = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 6, clothing: 'longLong' });
+ok('피부VI+긴팔긴바지 = (0.25×1000×0.32)/(12×0.06) = 111.1분', near(r2.vitd, 111.111, 0.01), '실제 ' + r2.vitd.toFixed(3));
+ok('피부VI 화상한계 = 1000/12 = 83.3분',                        near(r2.burn, 83.333, 0.01));
+ok('이 경우 화상 한계가 먼저 와서 목표를 못 채움',               r2.limitedBy === 'burn');
 
-var r3 = Engine.computePoint({ uvi: 0, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 });
+var r3 = Engine.computePoint({ uvi: 0, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
 ok('UVI 0 → 무한대(창 안 열림)', !isFinite(r3.minutes));
 
-/* f_BSA는 분모로 확정 → 옷을 더 껴입을수록(노출면적↓) 필요시간이 길어진다.
-   명세 원문(분자)으로 되돌리면 이 테스트도 같이 뒤집어야 한다. */
-var few = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong', spf: 1 }).vitd;
-var many = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 }).vitd;
+/* 노출면적은 분모 → 옷을 더 껴입을수록 필요시간이 길어진다.
+   기준 옷차림(F_REF = 반팔+반바지)에서 K가 정의되므로, 그때 필요시간 = 화상 한계 × K. */
+var few = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong' }).vitd;
+var many = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' }).vitd;
 ok('긴팔긴바지가 반팔반바지보다 필요시간이 길다 (노출면적이 적을수록 오래)',
-   Engine.F_BSA_IN_DENOMINATOR ? few > many : few < many,
-   '긴팔 ' + few.toFixed(1) + '분 vs 반팔 ' + many.toFixed(1) + '분');
-ok('[구조] SPF를 발라도 비타민D 필요시간은 그대로 (§2 공식에 SPF가 없음)',
-   Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 50 }).vitd === many);
-ok('[구조] 차단제 없을 때 화상 한계 = 비타민D 필요시간 × (f/k) → 반팔반바지면 동률',
-   Math.abs(Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort', spf: 1 }).burn / many - 1.0) < 0.01);
+   few > many, '긴팔 ' + few.toFixed(1) + '분 vs 반팔 ' + many.toFixed(1) + '분');
+ok('[구조] 기준 옷차림에서 비타민D 필요시간 = 화상 한계 × K(0.25)',
+   Math.abs(many / r.burn - Engine.K) < 0.001, '비율 ' + (many / r.burn).toFixed(3));
+ok('[구조] 필요시간은 노출면적에 반비례 (긴팔긴바지 = 반팔반바지 × 0.32/0.06)',
+   Math.abs(few / many - (0.32 / 0.06)) < 0.01, '배수 ' + (few / many).toFixed(2));
 
 /* ---------- 2. §3 열 안전 상한 구간표 ---------- */
 log('── 2. §3 체감온도 구간');
-ok('체감 <31℃ → 제한 없음', Engine.heatCap(30).minutes === Infinity);
-ok('31~35℃ → 20분',        Engine.heatCap(33).minutes === 20);
+ok('체감 <33℃ → 제한 없음 (기상청 폭염주의보 기준)', Engine.heatCap(32).minutes === Infinity);
+ok('33~35℃ → 20분',        Engine.heatCap(34).minutes === 20);
 ok('35~38℃ → 10분',        Engine.heatCap(36).minutes === 10);
 ok('38℃~ → 0분 (노출 금지)', Engine.heatCap(39).minutes === 0);
 ok('Heat Index 32℃/70% ≈ 41℃', near(Engine.heatIndex(32, 70), 41, 1.5),
