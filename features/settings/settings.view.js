@@ -22,6 +22,8 @@ var SettingsView = (function () {
       '<div class="ha-wrap">' +
         recordCard() +
 
+        StampView.card(StampService.model()) +
+
         group('내 정보',
           navRow('s-body-skin', '피부 타입', '타입 ' + skin) +
           navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '')) +
@@ -196,6 +198,7 @@ var SettingsView = (function () {
     var q = function (id) { return document.getElementById(id); };
 
     q('s-history').onclick = function () { WeeklyView.open('log'); };
+    if (q('s-stamp-more')) q('s-stamp-more').onclick = function () { StampView.openMonth(); };
     q('s-analysis').onclick = function () { WeeklyView.open('analysis'); };
     q('s-body-skin').onclick = q('s-body-cloth').onclick =
       function () { bodyInfoSheet(); };

@@ -47,6 +47,7 @@ var App = (function () {
       return;
     }
     var hash = (location.hash || '').replace('#', '');
+    if (hash === 'timer') hash = 'home';      // 주소로 바로 들어오는 길도 막는다
     if (hash) state.tab = hash;
     applyActiveTab(state.tab);
     boot();
@@ -114,16 +115,24 @@ var App = (function () {
      그 화면이 실제로 보인다(안 그러면 콘텐츠는 그려지는데 숨겨진 채로 남는다). */
   function applyActiveTab(tab) {
     [].forEach.call(document.querySelectorAll('.tab'), function (t) {
-      /* 분석(weekly)은 마이페이지의 하위 화면이라 마이페이지 탭을 켜 둔다 */
-      t.classList.toggle('on', t.dataset.tab === (tab === 'weekly' ? 'settings' : tab));
+      /* 분석(weekly)은 마이페이지의 하위 화면이라 마이페이지 탭을 켜 둔다.
+         타이머는 탭 자체가 없으므로 홈 탭을 켜 둔다 */
+      var lit = tab === 'weekly' ? 'settings' : tab === 'timer' ? 'home' : tab;
+      t.classList.toggle('on', t.dataset.tab === lit);
     });
     [].forEach.call(document.querySelectorAll('.screen'), function (s) {
       s.classList.toggle('active', s.id === 'screen-' + tab);
     });
   }
 
+  /* 타이머 화면은 '타이머 시작'을 누른 직후에만 열린다.
+     아래 탭에는 타이머 버튼이 없고, 주소·뒤로가기로 들어오면 홈으로 돌린다. */
+  var timerAllowed = false;
+
   function go(tab) {
     if (TABS.indexOf(tab) < 0) tab = 'home';
+    if (tab === 'timer' && !timerAllowed) tab = 'home';
+    if (tab !== 'timer') timerAllowed = false;
     state.tab = tab;
     if (location.hash !== '#' + tab) {
       try { history.replaceState(null, '', '#' + tab); } catch (e) {}
@@ -166,7 +175,15 @@ var App = (function () {
   function startTimer(win) {
     var rx = prescription();
     if (!rx) return;
-    if (!TimerService.isRunning()) TimerService.start(rx, win || rx.activeWindow || rx.targetWindow);
+    var over = TimerService.exhausted(rx);
+    if (over && !TimerService.isRunning()) {
+      UI.toast(over === 'heat'
+        ? '오늘은 더위 한계까지 다 쬐었어요 — 내일 다시 해요'
+        : '오늘은 화상 한계까지 다 쬐었어요 — 내일 다시 해요');
+    } else if (!TimerService.isRunning()) {
+      TimerService.start(rx, win || rx.activeWindow || rx.targetWindow);
+    }
+    timerAllowed = true;
     go('timer');
   }
 

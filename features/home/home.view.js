@@ -95,7 +95,9 @@ var HomeView = (function () {
     } else if (h.passed) {
       cta = '<button class="ha-cta" id="h-cta-tomorrow">' + UI.ICON.bell + '내일 알림 받기</button>';
     } else {
-      cta = '<button class="ha-cta" id="h-cta-time">' + UI.ICON.timer + '나가야 할 시간 보기</button>';
+      /* 햇빛 시간이 없는 날 — 타이머로 가는 버튼은 두지 않는다.
+         타이머는 '타이머 시작'으로만 열린다. */
+      cta = '';
     }
 
     return '<section class="ha-t ha-hero">' +
@@ -195,7 +197,6 @@ var HomeView = (function () {
     if (q('h-cta-sub')) q('h-cta-sub').onclick = function () {
       App.startTimer(m.rx.targetWindow);
     };
-    if (q('h-cta-time')) q('h-cta-time').onclick = function () { App.go('timer'); };
     if (q('h-cta-tomorrow')) q('h-cta-tomorrow').onclick = function () { App.enableNotify(); };
 
     [].forEach.call(el.querySelectorAll('[data-win]'), function (b) {

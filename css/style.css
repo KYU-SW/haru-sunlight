@@ -1,11 +1,12 @@
 @import url('https://cdn.jsdelivr.net/gh/toss/tossface/dist/tossface.css');
 /* =========================================================
-   하루햇빛 — 디자인 시스템 (작업 규칙은 저장소 맨 위 CLAUDE.md)
-   글꼴 Pretendard · 색은 네이비 한 계열 + 강조 파랑(#326CF9)
-   흰 바탕 위 옅은 면(#F3F6FB) 카드 · 그림자와 그라데이션 없음
-   ※ 옛 스타일 위에 새 스타일을 덧씌운 구조라, 같은 선택자가 여러 번 나온다.
-     최종 기준은 파일 맨 아래 블록이다.
+   하루 햇빛 — 디자인 시스템
+   레퍼런스: 연한 블루그레이 바탕 + 떠 있는 흰 라운드 카드,
+             원형 아이콘 버튼 + 파란 알약 CTA, 알약형 막대·도넛 게이지,
+             떠 있는 원형 하단 내비.
    ========================================================= */
+/* 원래 Pretendard(각진 인상)에서, 좀 더 둥글고 편안하게 읽히는 나눔고딕으로 바꿨다.
+   숫자·작은 라벨은 얇은 굵기(400)에서도 또렷하도록 tabular-nums를 그대로 쓴다. */
 @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.css');
 
 :root {
@@ -638,9 +639,9 @@ svg { display:block; flex:none; }
 .ob-step { font-size:12.5px; font-weight:800; color:var(--blue); margin-bottom:10px; }
 .ob-q { font-size:25px; font-weight:800; line-height:1.4; letter-spacing:-0.41px; }
 .ob-help { font-size:14px; color:var(--g500); margin-top:10px; line-height:1.55; font-weight:500; }
-.ob-opts { margin-top:26px; display:flex; flex-direction:column; gap:9px; }
+.ob-opts { margin-top:22px; display:flex; flex-direction:column; gap:8px; }
 .ob-opt {
-  width:100%; text-align:left; padding:16px; border-radius:var(--r-in);
+  width:100%; text-align:left; padding:13px 16px; border-radius:var(--r-in);
   background:var(--surface); box-shadow:var(--sh-btn); transition:.16s var(--ease);
   display:flex; align-items:center; gap:13px;
 }
@@ -649,6 +650,9 @@ svg { display:block; flex:none; }
 .ob-opt em { font-size:22px; font-style:normal; flex:none; }
 .ob-opt-t { font-size:15px; font-weight:700; letter-spacing:-0.14px; }
 .ob-opt.on .ob-opt-t { color:#fff; }
+.ob-opt .ob-opt-n { width:28px; height:28px; border-radius:50%; background:var(--g100, #f2f4f6); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--g700, #4e5968); }
+.ob-opt.on .ob-opt-n { background:var(--blue); color:#fff; }
+.ob-unsure { display:block; margin:12px auto 0; padding:6px 10px; background:none; border:0; font-size:13px; font-weight:600; color:var(--g500); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 .ob-opt-d { font-size:12px; color:var(--g500); margin-top:3px; font-weight:500; }
 .ob-opt.on .ob-opt-d { color:rgba(255,255,255,.82); }
 .ob-time {
@@ -1403,3 +1407,70 @@ html, body, #app, .phone,
 /* 토스트 — left:50% 때문에 폭이 화면 절반으로 묶여 "요"만 다음 줄로 떨어지던 문제.
    글 길이만큼 넓히고(최대 화면 폭 − 40px), 줄이 바뀌어도 단어 단위로만 끊는다. */
 #toast { width:max-content; max-width:calc(100% - 40px); word-break:keep-all; text-align:center; }
+
+/* =========================================================
+   타이머 화면 — 연한 파랑 면을 쓰지 않는다.
+   흰 바탕 위에 옅은 회색 선으로만 구분한다.
+   ========================================================= */
+#screen-timer .timer-card,
+#screen-timer .tstat,
+#screen-timer .tstat-duo,
+#screen-timer .tnote,
+#screen-timer .sec {
+  background:#fff; border:1px solid var(--hair); box-shadow:none;
+}
+#screen-timer .tstat.on { background:var(--blue); border-color:var(--blue); }
+/* 대기 중 배지 · 옷차림 버튼도 흰 바탕이라 선으로 테두리를 준다 */
+#screen-timer .top-mode.mode-cloudy { background:#fff; border:1px solid var(--hair); }
+#screen-timer .seg button:not(.on) { background:#fff; border:1px solid var(--hair); }
+
+
+/* =========================================================
+   스탬프 — 마이페이지 '내 정보' 위 · 이번 주 일곱 칸
+   ========================================================= */
+.stp { padding:16px 16px 4px; }
+.stp-h { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.stp-lab { font-size:12.5px; font-weight:700; color:var(--ink-3); }
+.stp-big { display:flex; align-items:baseline; gap:6px; margin-top:2px; }
+.stp-big b { font-size:30px; font-weight:800; letter-spacing:-0.04em; font-variant-numeric:tabular-nums; }
+.stp-big span { font-size:13.5px; font-weight:600; color:var(--ink-3); }
+.stp-streak { display:inline-flex; padding:5px 10px; border-radius:99px; background:#EAF0FF;
+  color:#1B4ED1; font-size:11.5px; font-weight:800; white-space:nowrap; }
+
+.stp-week { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:13px; }
+.stp-d { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.stp-dow { font-size:10.5px; font-weight:700; color:var(--ink-3); }
+.stp-d.now .stp-dow { color:#326CF9; }
+.stp-m { width:100%; max-width:40px; aspect-ratio:1; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; color:#F5A524; }
+.stp-m.off { background:#fff; border:1px solid var(--hair); }
+.stp-m.today { background:#fff; border:1.5px dashed #326CF9; }
+.stp-svg { width:100%; height:100%; display:block; }
+
+.stp-more { width:100%; margin-top:12px; padding:13px; border-top:1px solid var(--hair);
+  color:#326CF9; font-size:13.5px; font-weight:800; }
+.stp-more:active { background:#F3F6FB; }
+
+/* 한 달 치 시트 */
+.stp-sh-h { display:flex; align-items:baseline; justify-content:space-between; margin:4px 0 14px; }
+.stp-sh-t { font-size:17px; font-weight:800; letter-spacing:-0.03em; }
+.stp-sh-v { font-size:13px; font-weight:800; color:#326CF9; }
+.stp-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:7px; width:100%; }
+.stp-gd { font-size:10.5px; font-weight:700; color:var(--ink-3); text-align:center; padding-bottom:2px; }
+/* 못 채운 날 — 시트 바탕(연회색)과 같은 색이면 칸이 안 보인다. 한 톤 더 진하게. */
+.stp-c { aspect-ratio:1; min-width:0; border-radius:12px; background:rgba(19,26,43,.06); display:flex;
+  align-items:center; justify-content:center; font-size:11.5px; font-weight:700; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; }
+.stp-c.pad { background:none; }
+.stp-c.on { background:#fff; border:1px solid var(--hair); padding:5px; color:#F5A524; }
+.stp-c.today { box-shadow:inset 0 0 0 1.5px #326CF9; color:#326CF9; }
+/* 오늘 칸에도 도장이 찍혔으면 도장 색은 그대로 두고 테두리로만 표시한다 */
+.stp-c.on.today { color:#F5A524; }
+.stp-svg { max-width:100%; }
+.stp-legend { display:flex; gap:16px; margin-top:16px; padding-top:14px; border-top:1px solid var(--hair);
+  font-size:12.5px; font-weight:600; color:var(--ink-3); }
+.stp-legend span { display:inline-flex; align-items:center; gap:7px; }
+/* 범례 표시는 달력 칸과 같은 모양으로 — 둥근 네모 */
+.stp-lg { width:22px; height:22px; border-radius:7px; background:rgba(19,26,43,.06); display:flex;
+  align-items:center; justify-content:center; color:var(--ink-3); font-size:11px; font-weight:700; }
+.stp-lg.on { background:#fff; border:1px solid var(--hair); padding:2px; color:#F5A524; }

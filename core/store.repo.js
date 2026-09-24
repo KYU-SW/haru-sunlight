@@ -53,6 +53,21 @@ var Repo = (function () {
     return d;
   }
 
+  /* 일별 안전 한계 소모율 {'2026-09-24': {burn:0.62, heat:0.30}} — 0~1
+     화상·더위 한계는 하루 단위로 쌓인다. 타이머를 껐다 켜도 초기화되지 않는다. */
+  function getLoad() { return read('load', {}); }
+  function getDayLoad(dateKey) {
+    var l = getLoad()[dateKey] || {};
+    return { burn: l.burn || 0, heat: l.heat || 0, at: l.at || 0 };
+  }
+  function setDayLoad(dateKey, load) {
+    var l = getLoad();
+    /* at = 마지막으로 쬔 시각. 더위 몫은 쉬는 동안 줄어드므로 시각이 필요하다. */
+    l[dateKey] = { burn: load.burn || 0, heat: load.heat || 0, at: load.at || Date.now() };
+    write('load', l);
+    return l;
+  }
+
   /* 노출 이력 세션 단위 */
   function getSessions() { return read('sessions', []); }
   function addSession(s) {
@@ -67,7 +82,7 @@ var Repo = (function () {
   function setWeatherCache(obj) { write('weather', obj); }
 
   function reset() {
-    ['profile', 'location', 'daily', 'sessions', 'weather'].forEach(function (k) {
+    ['profile', 'location', 'daily', 'load', 'sessions', 'weather'].forEach(function (k) {
       try { localStorage.removeItem(NS + k); } catch (e) {}
     });
   }
@@ -76,6 +91,7 @@ var Repo = (function () {
     getProfile: getProfile, setProfile: setProfile,
     getLocation: getLocation, setLocation: setLocation,
     getDaily: getDaily, addCharge: addCharge,
+    getLoad: getLoad, getDayLoad: getDayLoad, setDayLoad: setDayLoad,
     getSessions: getSessions, addSession: addSession,
     getWeatherCache: getWeatherCache, setWeatherCache: setWeatherCache,
     reset: reset

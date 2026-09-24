@@ -12,7 +12,36 @@ var TimerService = (function () {
   function isRunning() { return !!(st && st.running); }
   function session() { return st; }
 
+  /* 오늘 이미 채운 몫 (0~1, 넘겼으면 1보다 클 수 있다).
+     타이머를 껐다 다시 켜도 처음부터 다시 쬐지 않도록 이 값에서 이어 간다. */
+  function carriedToday(rx) {
+    return (Repo.getDaily()[rx.dateKey] || 0) / 100;
+  }
+
+  /* 더위 회복 반감기 — 그늘·실내에서 30분 쉬면 더위 몫이 절반으로 준다.
+     화상(자외선 누적)은 회복되지 않으므로 그대로 쌓아 둔다. (CALCULATION.md §3-④) */
+  var HEAT_RECOVERY_HALF_LIFE_MIN = 30;
+
+  /* 오늘 이미 쓴 화상·더위 몫 (각 0~1) — 더위는 쉰 시간만큼 덜어 낸 값 */
+  function loadToday(rx) {
+    var l = Repo.getDayLoad(rx.dateKey);
+    var restMin = l.at ? (Date.now() - l.at) / 60000 : 0;
+    var heat = restMin > 0
+      ? l.heat * Math.pow(0.5, restMin / HEAT_RECOVERY_HALF_LIFE_MIN)
+      : l.heat;
+    if (heat < 0.01) heat = 0;
+    return { burn: l.burn, heat: heat, at: l.at };
+  }
+
+  /* 오늘 안전 한계를 다 썼는지 — 다 썼으면 더 쬐면 안 된다 */
+  function exhausted(rx) {
+    var l = loadToday(rx);
+    return l.burn >= 1 ? 'burn' : l.heat >= 1 ? 'heat' : null;
+  }
+
   function start(rx, win) {
+    var carried = carriedToday(rx);
+    var load = loadToday(rx);
     st = {
       rx: rx,
       window: win || null,
@@ -20,7 +49,13 @@ var TimerService = (function () {
       startedAt: Date.now(),
       lastTick: Date.now(),
       elapsedSec: 0,
-      dose: 0,                 // 0~1 · 비타민D 목표 대비 누적
+      dose: carried,           // 0~1 · 비타민D 목표 대비 누적 (오늘 쬔 몫부터 이어서)
+      carried: carried,        // 이번 세션이 시작할 때 이미 채워져 있던 몫
+      /* 이미 목표를 넘긴 날 — 비타민D 목표는 더 셀 게 없으므로
+         남은 시간을 안전 한계(화상·더위)로만 잡는다. 다시 8분을 요구하지 않는다. */
+      extra: carried >= 1,
+      burnDose: load.burn,     // 오늘 쓴 화상 한계 몫 (세션을 넘어 이어진다)
+      heatDose: load.heat,     // 오늘 쓴 더위 한계 몫
       last: null
     };
     tick();
@@ -60,6 +95,10 @@ var TimerService = (function () {
       st.elapsedSec += dt;
       var reqSec = p.vitd * 60;
       if (isFinite(reqSec) && reqSec > 0) st.dose += dt / reqSec;
+      /* 화상·더위도 같은 방식으로 '몫'을 쌓는다 — 조건이 바뀌면 쌓이는 속도도 바뀐다 */
+      var burnSec = p.burn * 60, heatSec = p.heat * 60;
+      if (isFinite(burnSec) && burnSec > 0) st.burnDose += dt / burnSec;
+      if (isFinite(heatSec) && heatSec > 0) st.heatDose += dt / heatSec;
     }
     return snapshot();
   }
@@ -68,9 +107,10 @@ var TimerService = (function () {
     var p = st.last || currentPoint();
     var reqSec = p.vitd * 60;
 
-    var doseRemain = isFinite(reqSec) ? Math.max(0, (1 - st.dose) * reqSec) : Infinity;
-    var burnRemain = isFinite(p.burn) ? Math.max(0, p.burn * 60 - st.elapsedSec) : Infinity;
-    var heatRemain = isFinite(p.heat) ? Math.max(0, p.heat * 60 - st.elapsedSec) : Infinity;
+    var doseRemain = st.extra ? Infinity
+                    : isFinite(reqSec) ? Math.max(0, (1 - st.dose) * reqSec) : Infinity;
+    var burnRemain = isFinite(p.burn) ? Math.max(0, (1 - st.burnDose) * p.burn * 60) : Infinity;
+    var heatRemain = isFinite(p.heat) ? Math.max(0, (1 - st.heatDose) * p.heat * 60) : Infinity;
 
     var remaining = Math.min(doseRemain, burnRemain, heatRemain);
     var reason = remaining === heatRemain ? 'heat'
@@ -80,7 +120,9 @@ var TimerService = (function () {
       running: st.running,
       elapsedSec: Math.round(st.elapsedSec),
       remainingSec: Math.round(remaining),
-      percent: Math.round(st.dose * 100),
+      percent: Math.round(st.dose * 100),      // 오늘 누적 (이어 간 몫 포함)
+      carriedPercent: Math.round(st.carried * 100),
+      extra: !!st.extra,                       // 목표를 넘긴 뒤 더 쬐는 중
       dose: st.dose,
       point: p,
       limitedBy: reason,
@@ -95,7 +137,11 @@ var TimerService = (function () {
   function finish() {
     var s = snapshot();
     var minutes = Math.max(1, Math.round(st.elapsedSec / 60));
-    var percent = Math.min(300, Math.round(st.dose * 100));
+    /* 기록에는 '이번에 더 채운 몫'만 더한다 — 이어 간 몫까지 더하면 두 번 세어진다 */
+    var percent = Math.min(300, Math.max(0, Math.round((st.dose - st.carried) * 100)));
+
+    /* 오늘 쓴 화상·더위 몫을 저장한다 — 다음에 다시 켜도 여기서 이어진다 */
+    Repo.setDayLoad(st.rx.dateKey, { burn: st.burnDose, heat: st.heatDose, at: Date.now() });
 
     HomeService.record(st.rx, {
       startedAt: st.startedAt,
@@ -116,6 +162,7 @@ var TimerService = (function () {
   return {
     start: start, stop: stop, tick: tick, snapshot: snapshot,
     isRunning: isRunning, session: session, reset: reset,
-    currentPoint: currentPoint
+    currentPoint: currentPoint, carriedToday: carriedToday, loadToday: loadToday, exhausted: exhausted,
+    HEAT_RECOVERY_HALF_LIFE_MIN: HEAT_RECOVERY_HALF_LIFE_MIN
   };
 })();
