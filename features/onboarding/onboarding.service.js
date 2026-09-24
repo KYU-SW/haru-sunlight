@@ -4,13 +4,16 @@
    ========================================================= */
 var OnboardingService = (function () {
 
-  /* §7 질문 1 — 피부 타입 */
+  /* §7 질문 1 — 피부 타입 (마이페이지와 같은 6단계 · 피츠패트릭 Ⅰ~Ⅵ) */
   var SKIN_OPTIONS = [
-    { type: 2, emoji: '🥵', title: '빨개지고 벗겨진다, 잘 안 탄다', desc: '타입 II · MED 250' },
-    { type: 3, emoji: '🙂', title: '조금 빨개졌다가 갈색으로 탄다', desc: '타입 III · MED 300' },
-    { type: 4, emoji: '😎', title: '거의 안 빨개지고 잘 탄다',     desc: '타입 IV · MED 400' },
-    { type: 3, emoji: '🤔', title: '잘 모르겠다',                  desc: '타입 III 기본값으로 시작' }
+    { type: 1, label: 'Ⅰ', title: '항상 타고 절대 안 그을림',   desc: '타입 Ⅰ' },
+    { type: 2, label: 'Ⅱ', title: '쉽게 타고 조금 그을림',      desc: '타입 Ⅱ' },
+    { type: 3, label: 'Ⅲ', title: '가끔 타고 서서히 그을림',    desc: '타입 Ⅲ' },
+    { type: 4, label: 'Ⅳ', title: '거의 안 타고 잘 그을림',     desc: '타입 Ⅳ' },
+    { type: 5, label: 'Ⅴ', title: '드물게 타고 진하게 그을림',  desc: '타입 Ⅴ' },
+    { type: 6, label: 'Ⅵ', title: '타지 않음',                  desc: '타입 Ⅵ' }
   ];
+  var UNSURE_INDEX = 2;   // '잘 모르겠어요' → 타입 Ⅲ 기본값
 
   var state = { step: 0, skinIndex: null, wakeTime: '07:00', loc: null };
 
@@ -62,7 +65,7 @@ var OnboardingService = (function () {
   }
 
   return {
-    SKIN_OPTIONS: SKIN_OPTIONS,
+    SKIN_OPTIONS: SKIN_OPTIONS, UNSURE_INDEX: UNSURE_INDEX,
     get state() { return state; },
     steps: steps, total: total, reset: reset,
     pickSkin: pickSkin, setWake: setWake, setLoc: setLoc,
