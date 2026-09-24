@@ -33,6 +33,11 @@ var SettingsView = (function () {
 
         group('위치',
           navRow('s-region', '지역', m.location ? UI.esc(m.location.name) : '설정 안 됨')) +
+
+        group('기록 전송',
+          toggleRow('s-send', '평가에 기록 보내기', ConsentService.given()) +
+          (ConsentService.given() ? infoRow('s-sent', '보낸 기록', Sync.count() + '개') : '') +
+          infoRow('s-uid', '기기 ID', uidText())) +
       '</div>';
 
     bind();
@@ -71,6 +76,19 @@ var SettingsView = (function () {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="st-v">' + value + UI.ICON.right + '</span></button>';
   }
+  function infoRow(id, label, value) {
+    return '<div class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
+      '<span class="st-v">' + value + '</span></div>';
+  }
+
+  /* 익명 로그인 uid — 앞 6자리만 보여 준다. 삭제를 요청할 때 불러 주는 번호다 (6절) */
+  function uidText() {
+    var id = Auth.uid();
+    if (id) return id.slice(0, 6);
+    if (!ConsentService.given()) return '없음';
+    return Auth.available() ? '연결 중…' : '연결 안 됨';
+  }
+
   function toggleRow(id, label, on) {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="sw' + (on ? ' on' : '') + '"></span></button>';
@@ -204,6 +222,21 @@ var SettingsView = (function () {
       function () { bodyInfoSheet(); };
     q('s-region').onclick = function () { regionSheet(); };
 
+    /* 기록 전송 — 끌 때는 바로, 켤 때는 동의 내용을 다시 보여 주고 받는다.
+       끄면 앞으로 올리지 않는다. 이미 올린 기록은 기기 ID로 삭제를 요청받는다(6절). */
+    q('s-send').onclick = function () {
+      if (ConsentService.given()) {
+        ConsentService.decline();
+        UI.toast('기록 전송을 껐어요');
+        render();
+      } else {
+        ConsentView.sheet(function () {
+          UI.toast('기록 전송을 켰어요');
+          render();
+        });
+      }
+    };
+
     q('s-notify').onclick = function () {
       if (!Notify.supported()) return UI.toast('이 브라우저는 알림을 지원하지 않아요');
       var cur = Repo.getProfile().notify && Notify.granted();
@@ -215,9 +248,16 @@ var SettingsView = (function () {
     };
   }
 
+  /* 익명 로그인이 늦게 끝나도 기기 ID 줄이 따라 바뀌게 */
+  Auth.onChange(function () {
+    var row = document.querySelector('#s-uid .st-v');
+    if (row) row.textContent = uidText();
+  });
+
   /* 설정이 바뀌면 처방을 다시 계산해야 한다 (아키텍처: 설정 변경 시 재계산) */
   function after() {
     App.invalidate();
+    if (window.Sync) Sync.run();
     render();
   }
 

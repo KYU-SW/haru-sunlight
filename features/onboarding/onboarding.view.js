@@ -95,7 +95,7 @@ var OnboardingView = (function () {
     return '' +
       '<div class="ob-step">2 / ' + S.total() + '</div>' +
       '<div class="ob-q">어디 계세요?</div>' +
-      '<div class="ob-help">그 지역 기상청 예보로 계산해요. 위치는 이 기기에만 저장돼요.</div>' +
+      '<div class="ob-help">그 지역 기상청 예보로 계산해요. 정확한 위치는 이 기기에만 남고, 보내더라도 시·도 이름뿐이에요.</div>' +
       (l ? '<div class="ob-picked">' + (cur ? areaLabel(cur) : UI.esc(l.name)) +
              (l.precise ? ' · 현재 위치' : '') + '</div>' : '') +
       '<button class="st-geo" id="ob-geo" style="margin-top:18px">' + UI.ICON.pin +
@@ -122,6 +122,7 @@ var OnboardingView = (function () {
       if (!S.canNext()) return;
       if (S.state.step === S.total() - 1) {
         S.complete();
+        if (window.Sync) Sync.run();   // 피부 타입·시도를 사용자 정보에 반영 (동의했을 때만)
         hide();
         App.boot();
       } else { S.next(); render(); }

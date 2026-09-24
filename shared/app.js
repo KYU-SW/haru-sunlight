@@ -46,6 +46,8 @@ var App = (function () {
       LoginView.show();
       return;
     }
+    if (ConsentService.given()) Auth.ensure(); // 동의한 사람만 익명 로그인 (기다리지 않음)
+    Sync.start();                              // 밀린 기록 올리기 + 온라인 복귀 때 다시 시도 (동의 안 했으면 아무것도 안 함)
     var hash = (location.hash || '').replace('#', '');
     if (hash === 'timer') hash = 'home';      // 주소로 바로 들어오는 길도 막는다
     if (hash) state.tab = hash;

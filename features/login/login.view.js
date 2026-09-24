@@ -3,9 +3,9 @@
    앱 아이콘과 같은 테마(파란 배경 + 노란 해)로 첫 진입을 맞는다.
    온보딩을 아직 안 한 사용자에게만 뜬다.
 
-   ⚠️ 게스트 모드 하나뿐이다. 이 앱은 백엔드가 없고 모든 데이터가 기기에만
-      남으므로, 인증할 서버도 보관할 계정도 존재하지 않는다.
-      아이디·비밀번호를 받는 시늉을 하느니 게스트로 바로 들어가는 편이 정직하다.
+   "게스트로 시작하기" → 동의 화면 → 온보딩 (작업지시서 4-2).
+   동의한 사람만 익명 로그인하고 기록을 올린다(ConsentService.agree → Sync.run).
+   동의하지 않아도 앱은 똑같이 쓰고, 기록은 기기에만 남는다.
    ========================================================= */
 var LoginView = (function () {
 
@@ -29,13 +29,14 @@ var LoginView = (function () {
 
         '<div class="lg-foot">' +
           '<button class="btn lg-btn" id="lg-guest">게스트로 시작하기</button>' +
-          '<p class="lg-note">계정 없이 바로 씁니다 · 기록은 이 기기에만 저장돼요</p>' +
+          '<p class="lg-note">계정 없이 바로 씁니다 · 동의한 경우에만 기록을 익명으로 보내요</p>' +
         '</div>' +
       '</div>';
 
     document.getElementById('lg-guest').onclick = function () {
       hide();
-      OnboardingView.show();   // 피부 타입·지역 두 가지는 계산에 꼭 필요해 여기서 받는다
+      /* 동의를 먼저 받고, 답하면 온보딩으로 (피부 타입·지역은 계산에 꼭 필요하다) */
+      ConsentView.show(function () { OnboardingView.show(); });
     };
   }
 

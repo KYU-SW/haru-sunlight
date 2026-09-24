@@ -13,7 +13,8 @@ var Repo = (function () {
     wakeTime: '07:00',    // §6 생체리듬 축
     useCircadian: true,
     supplement: false,    // §5 합산 상한 경고용
-    notify: false
+    notify: false,
+    consent: null         // 기록 수집 동의 {agreed, version, at} — 답하기 전엔 null
   };
 
   function read(key, fallback) {

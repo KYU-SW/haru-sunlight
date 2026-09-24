@@ -307,6 +307,7 @@ var HomeService = (function () {
       spf: session.spf,
       limitedBy: session.limitedBy
     });
+    if (window.Sync) Sync.run();     // 끝난 기록을 바로 올려 본다 — 실패하면 다음에 다시
   }
 
   return {
