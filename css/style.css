@@ -1511,3 +1511,87 @@ body { word-break:keep-all; overflow-wrap:break-word; }
 #login .btn:disabled { opacity:.6; }
 /* 로그인·동의·온보딩 화면에서는 아래쪽에 큰 버튼이 있어 알림 문구를 그 위로 올린다 */
 body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(186px + var(--safe-b)); }
+
+/* =========================================================
+   로그인 — 하늘 + 시트 (시안 1)
+   위 46%는 하늘, 아래는 흰 시트. 해가 시트 뒤에서 떠오른다.
+   하늘색은 시각에 따라 네 가지(lg2-morning · day · evening · night).
+   ========================================================= */
+#login:has(.lg2) { background:#2F66F0; }
+.lg2 { --sky1:#2F66F0; --sky2:#5E8BFF; --sky3:#FFD48A; --sun1:#FFF1B0; --sun2:#F8CB45; --glow:rgba(255,228,128,.26);
+  position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden;
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 30%,var(--sky3) 48%,var(--sky3) 100%); }
+.lg2-morning { --sky1:#4F7BF2; --sky2:#8FB0FF; --sky3:#FFD2A8; --sun1:#FFF4C9; --sun2:#FFC56B; }
+.lg2-evening { --sky1:#3A4FC7; --sky2:#B071C9; --sky3:#FFA37A; --sun1:#FFD9A0; --sun2:#FF8A4C; --glow:rgba(255,150,90,.26); }
+.lg2-night   { --sky1:#101A3D; --sky2:#27377A; --sky3:#4A5AA8; --sun1:#FFF6D8; --sun2:#E7E3C8; --glow:rgba(255,246,216,.14); }
+
+.lg2-sky { position:absolute; left:0; right:0; top:0; height:48%; pointer-events:none; }
+.lg2-sun { position:absolute; left:50%; bottom:-78px; width:190px; height:190px; margin-left:-95px; border-radius:50%;
+  background:radial-gradient(circle at 50% 38%,var(--sun1),var(--sun2) 72%);
+  box-shadow:0 0 0 22px var(--glow), 0 0 0 52px var(--glow);
+  animation:lgRise 1.1s cubic-bezier(.2,.8,.25,1) both; }
+.lg2-ray { position:absolute; left:50%; bottom:-78px; width:190px; height:190px; margin-left:-95px; border-radius:50%;
+  border:1.5px solid rgba(255,255,255,.28); animation:lgPulse 4.5s ease-out infinite; }
+.lg2-ray.r2 { animation-delay:2.25s; }
+.lg2-night .lg2-sky::before { content:''; position:absolute; inset:0;
+  background-image:radial-gradient(1.5px 1.5px at 18% 22%,#fff,transparent),radial-gradient(1px 1px at 72% 14%,#fff,transparent),
+    radial-gradient(1.5px 1.5px at 84% 38%,#fff,transparent),radial-gradient(1px 1px at 34% 44%,#fff,transparent),
+    radial-gradient(1px 1px at 58% 30%,#fff,transparent); opacity:.8; }
+@keyframes lgRise { from { transform:translateY(90px); } to { transform:none; } }
+@keyframes lgPulse { 0% { transform:scale(1); opacity:.9; } 100% { transform:scale(1.9); opacity:0; } }
+
+.lg2-head { position:relative; padding:calc(58px + var(--safe-t, 0px)) 26px 0; color:#fff; }
+.lg2-title { font-size:34px; font-weight:900; letter-spacing:-0.06em; margin:0; text-shadow:0 2px 14px rgba(10,30,90,.18); }
+.lg2-greet { margin:6px 0 0; font-size:15px; font-weight:600; opacity:.9; }
+.lg2-close { position:absolute; right:18px; top:calc(52px + var(--safe-t, 0px)); width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,.18); color:#fff; display:flex; align-items:center; justify-content:center; }
+.lg2-close svg { width:18px; height:18px; }
+.lg2-prev { right:auto; left:14px; top:calc(44px + var(--safe-t, 0px)); background:transparent; }
+.lg2-head:has(.lg2-prev) { padding-top:calc(92px + var(--safe-t, 0px)); }
+.lg2-prev svg { width:20px; height:20px; }
+
+.lg2-sheet { position:relative; margin-top:auto; min-height:56%; background:#fff; border-radius:28px 28px 0 0;
+  padding:24px 22px calc(20px + var(--safe-b, 0px)); display:flex; flex-direction:column;
+  box-shadow:0 -12px 30px rgba(10,30,90,.12); animation:lgSheet .55s cubic-bezier(.2,.8,.25,1) .1s both; }
+@keyframes lgSheet { from { transform:translateY(40px); opacity:0; } to { transform:none; opacity:1; } }
+
+.lg2-tabs { position:relative; display:flex; background:#F1F4F9; border-radius:14px; padding:4px; }
+.lg2-tabs button { position:relative; z-index:1; flex:1; padding:10px 0; font-size:14.5px; font-weight:700; color:#8B94A6; transition:color .2s; }
+.lg2-tabs button.on { color:#131A2B; }
+.lg2-tab-bar { position:absolute; top:4px; bottom:4px; left:4px; width:calc(50% - 4px); border-radius:11px; background:#fff;
+  box-shadow:0 1px 4px rgba(19,26,43,.12); transition:transform .25s cubic-bezier(.2,.8,.25,1); }
+.lg2-tab-bar.signup { transform:translateX(100%); }
+
+.lg2-form { margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+.lg2-field { display:flex; align-items:center; gap:10px; height:54px; padding:0 8px 0 16px; border-radius:15px;
+  background:#fff; box-shadow:inset 0 0 0 1px rgba(19,26,43,.12); color:#9AA3B2; cursor:text; transition:box-shadow .15s; }
+.lg2-field:focus-within { box-shadow:inset 0 0 0 1.6px #326CF9; color:#326CF9; }
+.lg2-field > svg { width:19px; height:19px; flex:none; }
+.lg2-field input { flex:1; min-width:0; border:0; outline:0; background:transparent; font:inherit; font-size:16px; font-weight:500; color:#131A2B; }
+.lg2-field input::placeholder { color:#9AA3B2; }
+.lg2-eye { width:38px; height:38px; flex:none; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#B0B8C6; }
+.lg2-eye svg { width:19px; height:19px; }
+.lg2-eye.on { color:#326CF9; }
+
+.lg2-link { align-self:flex-end; margin-top:10px; padding:4px 2px; font-size:13px; font-weight:600; color:#8B94A6; }
+.lg2-checks { display:flex; gap:14px; margin-top:12px; padding-left:4px; }
+.lg2-checks span { display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:#A3ABBA; transition:color .2s; }
+.lg2-checks span::before { content:''; width:15px; height:15px; border-radius:50%; background:#E7EBF2;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size:100%; transition:background-color .2s; }
+.lg2-checks span.ok { color:#1E9E62; }
+.lg2-checks span.ok::before { background-color:#22B573; }
+
+.lg2-sp { flex:1; min-height:18px; }
+.lg2-submit { height:54px; border-radius:15px; font-size:16px; }
+.lg2.busy .lg2-sun { animation:lgSpin 1.2s linear infinite; }
+@keyframes lgSpin { 50% { transform:scale(1.06); } }
+.lg2-guest { margin-top:12px; padding:10px; text-align:center; font-size:13.5px; font-weight:600; color:#8B94A6; }
+.lg2-guest b { color:#326CF9; font-weight:800; }
+.lg2-offline { margin:6px 0 0; font-size:14.5px; line-height:1.6; color:#4A5568; text-align:center; }
+.lg2-modal .lg2-sheet { min-height:60%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lg2-sun, .lg2-sheet, .lg2-ray, .lg2.busy .lg2-sun { animation:none; }
+  .lg2-ray { display:none; }
+}
