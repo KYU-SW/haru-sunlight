@@ -77,15 +77,16 @@ var SettingsView = (function () {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="st-v">' + value + UI.ICON.right + '</span></button>';
   }
-  /* ---------- 계정 — 구글 로그인 상태 · 로그인/로그아웃 ----------
+  /* ---------- 계정 — 로그인 상태 · 로그인/회원가입/로그아웃 ----------
      Firebase를 못 불러오면 묶음째 숨긴다(게스트로만 쓰는 상태). */
   function accountGroup() {
     if (!Auth.available()) return '';
     return group('계정',
-      Auth.isGoogle()
-        ? infoRow('s-acct', '구글 계정', UI.esc(Auth.email())) +
+      Auth.isMember()
+        ? infoRow('s-acct', '이메일', UI.esc(Auth.email())) +
           '<button class="st-row" id="s-logout"><span class="st-l">로그아웃</span></button>'
-        : navRow('s-login', '구글로 로그인', '게스트'));
+        : navRow('s-login', '로그인', '게스트') +
+          navRow('s-signup', '회원가입', ''));
   }
 
   function infoRow(id, label, value) {
@@ -249,16 +250,9 @@ var SettingsView = (function () {
       }
     };
 
-    /* 게스트 → 구글: 쓰던 익명 uid를 그대로 이어 받는다(Auth.signInWithGoogle) */
-    if (q('s-login')) q('s-login').onclick = function () {
-      Auth.signInWithGoogle()
-        .then(function () {
-          UI.toast('구글 계정으로 로그인했어요');
-          if (window.Sync) Sync.run();
-          render();
-        })
-        .catch(function (e) { var msg = Auth.errorText(e); if (msg) UI.toast(msg); });
-    };
+    /* 게스트 → 계정: 회원가입하면 쓰던 익명 uid를 그대로 이어 받는다(Auth.signUpEmail) */
+    if (q('s-login')) q('s-login').onclick = function () { LoginView.openFromSettings('login'); };
+    if (q('s-signup')) q('s-signup').onclick = function () { LoginView.openFromSettings('signup'); };
     /* 로그아웃해도 기기에 저장된 기록·설정은 그대로다. 이후에는 게스트로 쓴다. */
     if (q('s-logout')) q('s-logout').onclick = function () {
       Auth.signOut().then(function () {

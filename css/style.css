@@ -1498,7 +1498,16 @@ html, body, #app, .phone,
    공백 없는 긴 문자열(주소·ID)은 넘칠 때만 끊는다. */
 body { word-break:keep-all; overflow-wrap:break-word; }
 
-/* 시작 화면 — 두 번째 버튼(게스트). 연한 파랑 바탕 + 파란 글자 (지침서 1절의 보조 버튼 색) */
+/* 시작 화면 — 두 번째 버튼(회원가입). 연한 파랑 바탕 + 파란 글자 (지침서 1절의 보조 버튼 색) */
 .lg-btn2 { margin-top:10px; background:#EAF0FF; color:#326CF9; border-radius:12px; font-size:16.5px; }
 .lg-btn2:active { background:#E3ECFF; }
-.lg-btn:disabled { opacity:.6; }
+.lg-foot .ob-skip { margin-top:4px; }
+
+/* 로그인 · 회원가입 입력 — 온보딩 틀 + 검색칸 모양(.st-search) 재사용 */
+.lg-form { margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+.lg-field { margin-top:0; }
+.lg-link { margin-top:14px; padding:4px 2px; font-size:13.5px; font-weight:600; color:var(--ink-3);
+  text-decoration:underline; text-underline-offset:3px; }
+#login .btn:disabled { opacity:.6; }
+/* 로그인·동의·온보딩 화면에서는 아래쪽에 큰 버튼이 있어 알림 문구를 그 위로 올린다 */
+body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(186px + var(--safe-b)); }

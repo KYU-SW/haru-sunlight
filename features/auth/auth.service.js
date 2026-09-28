@@ -3,8 +3,10 @@
 
    두 가지 길
      · 게스트: 익명 로그인. 아무것도 입력하지 않고 기기마다 uid 하나를 받는다.
-     · 구글: 폰을 바꾸거나 앱 데이터를 지워도 같은 uid(같은 참가자)로 기록된다.
+     · 계정: 이메일 + 비밀번호로 가입·로그인한다. 폰을 바꾸거나 앱 데이터를 지워도
+             같은 uid(같은 참가자)로 기록된다.
    이메일은 로그인 확인에만 쓰고 Firestore 기록에는 넣지 않는다.
+   ⚠️ Firebase 콘솔 › Authentication › 로그인 방법에서 '이메일/비밀번호'를 켜야 동작한다.
 
    원칙: 앱은 Firebase 없이도 돌아가야 한다 (오프라인 우선).
      · SDK를 못 불러오거나 네트워크가 없으면 조용히 넘어간다.
@@ -46,7 +48,7 @@ var Auth = (function () {
   /* 이미 로그인돼 있으면 그대로, 처음이면 익명 계정을 만든다 */
   function signIn() {
     if (!auth) return Promise.reject(new Error('firebase-unavailable'));
-    /* 처음 상태가 아니라 '지금' 상태를 본다 — 그 사이 구글로 로그인했으면 그대로 쓴다 */
+    /* 처음 상태가 아니라 '지금' 상태를 본다 — 그 사이 계정으로 로그인했으면 그대로 쓴다 */
     return firstState.then(function () {
       return user || auth.signInAnonymously().then(function (r) { return r.user; });
     });
@@ -60,44 +62,52 @@ var Auth = (function () {
     });
   }
 
-  /* ---------- 구글 로그인 ----------
-     게스트(익명)로 쓰던 사람이 로그인하면 linkWithPopup으로 같은 uid를 이어 쓴다
-     → 그동안 올린 기록과 새 기록이 한 사람으로 묶인다.
-     이미 다른 기기에서 그 구글 계정으로 로그인한 적이 있으면 그 계정 uid로 들어간다.
-     이메일은 Firebase 로그인 확인에만 쓰고, Firestore 기록에는 담지 않는다(보안 규칙이 막는다).
-     ⚠️ Firebase 콘솔 › Authentication › 로그인 방법에서 Google을 켜야 동작한다. */
-  function signInWithGoogle() {
+  /* ---------- 이메일 계정 ----------
+     회원가입: 게스트(익명)로 쓰던 중이면 linkWithCredential로 같은 uid에 계정을 붙인다
+               → 그동안 올린 기록과 새 기록이 한 사람으로 묶인다. 처음이면 새로 만든다.
+     로그인:   그 계정의 uid로 들어간다(다른 기기에서도 같은 참가자).
+     이메일은 Firebase 로그인 확인에만 쓰고, Firestore 기록에는 담지 않는다(보안 규칙이 막는다). */
+  function signUpEmail(email, pw) {
     if (!auth) return Promise.reject({ code: 'firebase-unavailable' });
-    var provider = new firebase.auth.GoogleAuthProvider();
-    provider.setCustomParameters({ prompt: 'select_account' });
     return firstState.then(function () {
-      var u = user;
-      if (u && u.isAnonymous) {
-        return u.linkWithPopup(provider).catch(function (e) {
-          /* 이 구글 계정이 이미 다른 uid에 연결돼 있으면 그 계정으로 로그인 */
-          if (e && e.code === 'auth/credential-already-in-use' && e.credential) {
-            return auth.signInWithCredential(e.credential);
-          }
-          throw e;
-        });
+      if (user && user.isAnonymous) {
+        var cred = firebase.auth.EmailAuthProvider.credential(email, pw);
+        return user.linkWithCredential(cred);
       }
-      return auth.signInWithPopup(provider);
+      return auth.createUserWithEmailAndPassword(email, pw);
     }).then(function (r) { return r.user; });
+  }
+
+  function signInEmail(email, pw) {
+    if (!auth) return Promise.reject({ code: 'firebase-unavailable' });
+    return auth.signInWithEmailAndPassword(email, pw).then(function (r) { return r.user; });
+  }
+
+  function resetPassword(email) {
+    if (!auth) return Promise.reject({ code: 'firebase-unavailable' });
+    return auth.sendPasswordResetEmail(email);
   }
 
   /* 로그인 실패를 화면에 보여 줄 한국어 문구로 */
   function errorText(e) {
     var code = (e && e.code) || '';
-    if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') return null; // 사용자가 닫음 — 알리지 않음
-    if (code === 'auth/popup-blocked') return '팝업이 막혔어요. 브라우저에서 팝업을 허용해 주세요';
-    if (code === 'auth/operation-not-allowed') return '구글 로그인이 아직 켜져 있지 않아요 (Firebase 설정 필요)';
-    if (code === 'auth/unauthorized-domain') return '이 주소에서는 로그인할 수 없어요 (승인 도메인 설정 필요)';
+    if (code === 'auth/email-already-in-use' || code === 'auth/credential-already-in-use')
+      return '이미 가입된 이메일이에요. 로그인해 주세요';
+    if (code === 'auth/invalid-email') return '이메일 형식이 맞지 않아요';
+    if (code === 'auth/weak-password') return '비밀번호가 너무 짧아요';
+    if (code === 'auth/invalid-credential' || code === 'auth/invalid-login-credentials' ||
+        code === 'auth/wrong-password' || code === 'auth/user-not-found')
+      return '이메일 또는 비밀번호가 맞지 않아요';
+    if (code === 'auth/missing-password') return '비밀번호를 입력해 주세요';
+    if (code === 'auth/too-many-requests') return '시도가 너무 많아요. 잠시 뒤 다시 해 주세요';
+    if (code === 'auth/operation-not-allowed') return '이메일 로그인이 아직 켜져 있지 않아요 (Firebase 설정 필요)';
     if (code === 'auth/network-request-failed') return '인터넷 연결을 확인해 주세요';
     if (code === 'firebase-unavailable') return '지금은 로그인할 수 없어요';
     return '로그인하지 못했어요. 잠시 뒤 다시 해 주세요';
   }
 
-  function isGoogle() { return !!(user && !user.isAnonymous); }
+  /* 계정으로 로그인한 상태인가 (게스트 = 익명은 아님) */
+  function isMember() { return !!(user && !user.isAnonymous); }
   function email() { return user && !user.isAnonymous ? (user.email || '') : ''; }
 
   function signOut() { return auth ? auth.signOut() : Promise.resolve(); }
@@ -111,8 +121,8 @@ var Auth = (function () {
 
   return {
     available: available, signIn: signIn, ensure: ensure,
-    signInWithGoogle: signInWithGoogle, errorText: errorText,
-    isGoogle: isGoogle, email: email,
+    signUpEmail: signUpEmail, signInEmail: signInEmail, resetPassword: resetPassword,
+    errorText: errorText, isMember: isMember, email: email,
     signOut: signOut, uid: uid, onChange: onChange
   };
 })();
