@@ -34,9 +34,10 @@ var SettingsView = (function () {
         group('위치',
           navRow('s-region', '지역', m.location ? UI.esc(m.location.name) : '설정 안 됨')) +
 
+        accountGroup() +
+
         group('기록 전송',
           toggleRow('s-send', '평가에 기록 보내기', ConsentService.given()) +
-          (ConsentService.given() ? infoRow('s-sent', '보낸 기록', Sync.count() + '개') : '') +
           infoRow('s-uid', '기기 ID', uidText())) +
       '</div>';
 
@@ -76,6 +77,17 @@ var SettingsView = (function () {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="st-v">' + value + UI.ICON.right + '</span></button>';
   }
+  /* ---------- 계정 — 구글 로그인 상태 · 로그인/로그아웃 ----------
+     Firebase를 못 불러오면 묶음째 숨긴다(게스트로만 쓰는 상태). */
+  function accountGroup() {
+    if (!Auth.available()) return '';
+    return group('계정',
+      Auth.isGoogle()
+        ? infoRow('s-acct', '구글 계정', UI.esc(Auth.email())) +
+          '<button class="st-row" id="s-logout"><span class="st-l">로그아웃</span></button>'
+        : navRow('s-login', '구글로 로그인', '게스트'));
+  }
+
   function infoRow(id, label, value) {
     return '<div class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="st-v">' + value + '</span></div>';
@@ -237,6 +249,24 @@ var SettingsView = (function () {
       }
     };
 
+    /* 게스트 → 구글: 쓰던 익명 uid를 그대로 이어 받는다(Auth.signInWithGoogle) */
+    if (q('s-login')) q('s-login').onclick = function () {
+      Auth.signInWithGoogle()
+        .then(function () {
+          UI.toast('구글 계정으로 로그인했어요');
+          if (window.Sync) Sync.run();
+          render();
+        })
+        .catch(function (e) { var msg = Auth.errorText(e); if (msg) UI.toast(msg); });
+    };
+    /* 로그아웃해도 기기에 저장된 기록·설정은 그대로다. 이후에는 게스트로 쓴다. */
+    if (q('s-logout')) q('s-logout').onclick = function () {
+      Auth.signOut().then(function () {
+        UI.toast('로그아웃했어요 · 게스트로 계속 써요');
+        render();
+      });
+    };
+
     q('s-notify').onclick = function () {
       if (!Notify.supported()) return UI.toast('이 브라우저는 알림을 지원하지 않아요');
       var cur = Repo.getProfile().notify && Notify.granted();
@@ -248,10 +278,12 @@ var SettingsView = (function () {
     };
   }
 
-  /* 익명 로그인이 늦게 끝나도 기기 ID 줄이 따라 바뀌게 */
+  /* 로그인이 늦게 끝나거나 로그인·로그아웃하면 기기 ID와 계정 줄이 따라 바뀌게 */
   Auth.onChange(function () {
     var row = document.querySelector('#s-uid .st-v');
     if (row) row.textContent = uidText();
+    var scr = document.getElementById('screen-settings');
+    if (scr && scr.classList.contains('active')) render();
   });
 
   /* 설정이 바뀌면 처방을 다시 계산해야 한다 (아키텍처: 설정 변경 시 재계산) */

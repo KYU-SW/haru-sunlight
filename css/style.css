@@ -1490,3 +1490,15 @@ html, body, #app, .phone,
 .cs-check input { width:20px; height:20px; margin:0; flex:none; accent-color:#326CF9; }
 .cs-check:has(input:checked) { border-color:#326CF9; background:#F3F7FF; }
 .ob-help b { color:var(--ink); font-weight:700; }
+
+/* 시간 범위 줄표 — 큰 숫자의 좁은 자간 때문에 숫자에 붙어 보이지 않게 양옆을 조금 띄운다 */
+.ha-big .ha-dash { margin:0 0.14em; }
+
+/* 한국어 줄바꿈 — 단어 중간("채웁니/다")에서 끊지 않고 띄어쓰기 단위로 넘긴다.
+   공백 없는 긴 문자열(주소·ID)은 넘칠 때만 끊는다. */
+body { word-break:keep-all; overflow-wrap:break-word; }
+
+/* 시작 화면 — 두 번째 버튼(게스트). 연한 파랑 바탕 + 파란 글자 (지침서 1절의 보조 버튼 색) */
+.lg-btn2 { margin-top:10px; background:#EAF0FF; color:#326CF9; border-radius:12px; font-size:16.5px; }
+.lg-btn2:active { background:#E3ECFF; }
+.lg-btn:disabled { opacity:.6; }

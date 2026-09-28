@@ -102,7 +102,9 @@ var HomeView = (function () {
 
     return '<section class="ha-t ha-hero">' +
       '<div class="ha-lab">오늘의 처방</div>' +
-      '<div class="ha-big' + (h.state === 'closed' ? ' sm' : '') + '">' + big + '</div>' +
+      '<div class="ha-big' + (h.state === 'closed' ? ' sm' : '') + '">' +
+        /* 큰 숫자는 자간을 좁혀 두어 '11:00–14:00'의 줄표가 숫자에 붙는다 — 줄표만 따로 띄운다 */
+        big.replace('–', '<span class="ha-dash">–</span>') + '</div>' +
       '<div class="ha-sub">' + sub + '</div>' +
       '<div class="ha-art">' + tf(art) + '</div>' +
       cta +
