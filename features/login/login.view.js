@@ -72,10 +72,7 @@ var LoginView = (function () {
     var signup = mode === 'signup';
     return '<div class="ob-in">' +
       '<div class="ob-body enter">' +
-        '<div class="ob-q">' + (signup ? '계정을 만들어요' : '로그인') + '</div>' +
-        '<div class="ob-help">' + (signup
-          ? '로그인하면 폰을 바꿔도 같은 사람으로 기록돼요.'
-          : '가입한 이메일과 비밀번호를 입력해 주세요.') + '</div>' +
+        '<div class="ob-q">' + (signup ? '회원가입' : '로그인') + '</div>' +
         '<div class="lg-form">' +
           field('lg-email', 'email', '이메일', 'email') +
           field('lg-pw', 'password', signup ? '비밀번호 (8자 이상)' : '비밀번호',
