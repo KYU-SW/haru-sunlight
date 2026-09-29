@@ -78,8 +78,13 @@ var Auth = (function () {
     }).then(function (r) { return r.user; });
   }
 
+  /* 관리자 아이디 — '@' 없이 적으면 프로젝트 주소를 붙인다 (admin → admin@haru-sunlight.firebaseapp.com).
+     참가자는 원래 이메일을 쓰므로 영향이 없다. */
+  var ADMIN_DOMAIN = 'haru-sunlight.firebaseapp.com';
   function signInEmail(email, pw) {
     if (!auth) return Promise.reject({ code: 'firebase-unavailable' });
+    email = String(email || '').trim();
+    if (email && email.indexOf('@') < 0) email += '@' + ADMIN_DOMAIN;
     return auth.signInWithEmailAndPassword(email, pw).then(function (r) { return r.user; });
   }
 
@@ -106,6 +111,17 @@ var Auth = (function () {
     return '로그인하지 못했어요. 잠시 뒤 다시 해 주세요';
   }
 
+  /* 관리자인가 — 보안 규칙(firestore.rules isAdmin)에 직접 물어본다.
+     관리자만 users 전체 목록을 읽을 수 있으므로, 한 건만 읽어 보고 되면 관리자다.
+     관리자 이메일 목록을 앱 코드에 두지 않는다(규칙 한 곳에서만 관리). */
+  function checkAdmin() {
+    if (!auth || !user || user.isAnonymous) return Promise.resolve(false);
+    if (!(firebase.firestore)) return Promise.resolve(false);
+    return firebase.firestore().collection('users').limit(1).get()
+      .then(function () { return true; })
+      .catch(function () { return false; });           // permission-denied = 일반 참가자
+  }
+
   /* 계정으로 로그인한 상태인가 (게스트 = 익명은 아님) */
   function isMember() { return !!(user && !user.isAnonymous); }
   function email() { return user && !user.isAnonymous ? (user.email || '') : ''; }
@@ -122,7 +138,7 @@ var Auth = (function () {
   return {
     available: available, signIn: signIn, ensure: ensure,
     signUpEmail: signUpEmail, signInEmail: signInEmail, resetPassword: resetPassword,
-    errorText: errorText, isMember: isMember, email: email,
+    errorText: errorText, isMember: isMember, email: email, checkAdmin: checkAdmin,
     signOut: signOut, uid: uid, onChange: onChange
   };
 })();
