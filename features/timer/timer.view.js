@@ -17,6 +17,9 @@ var TimerView = (function () {
     if (TimerService.isRunning()) startLoop();
   }
 
+  /* 오늘 이미 채운 몫 (0~1) — 타이머를 다시 켜도 그만큼은 빼고 보여 준다 */
+  function carried() { return rx ? TimerService.carriedToday(rx) : 0; }
+
   /* 정지 상태에서 보여 줄 예상치 — 지금 열린 창이면 '지금', 아니면 다음 창의 최적 시점 */
   function previewPoint() {
     if (!rx) return null;
@@ -30,12 +33,15 @@ var TimerView = (function () {
 
   function paint() {
     var running = TimerService.isRunning();
+    var stop = rx ? TimerService.exhausted(rx) : null;   // 오늘 안전 한계를 다 쓴 상태
     var s = running ? TimerService.snapshot() : null;
     var p = running ? s.point : previewPoint();
     var w = rx ? (rx.activeWindow || rx.targetWindow) : null;
 
-    var seconds = running ? s.remainingSec : (p && isFinite(p.minutes) ? Math.round(p.minutes * 60) : null);
-    var pct = running ? Math.min(1, s.dose) : 0;
+    var left = Math.max(0, 1 - carried());
+    var seconds = running ? s.remainingSec
+                          : (p && isFinite(p.minutes) ? Math.round(p.minutes * 60 * left) : null);
+    var pct = running ? Math.min(1, s.dose) : Math.min(1, carried());
 
     el.innerHTML =
       '<div class="hdr">' +
@@ -70,7 +76,11 @@ var TimerView = (function () {
             '<div class="ring-in">' +
               '<div class="ring-num" id="t-clock">' + clock(seconds) + '</div>' +
               '<div class="ring-lab" id="t-lab">' + label(running, s, p) + '</div>' +
-              '<div class="ring-pct" id="t-pct">' + (running ? s.percent + '% 충전' : chargeHint(w)) + '</div>' +
+              '<div class="ring-pct" id="t-pct">' +
+                (running ? s.percent + '% 충전'
+                         : carried() >= 1 ? '오늘 ' + Math.round(carried() * 100) + '% 채웠어요 · 목표 끝'
+                         : carried() > 0 ? '오늘 ' + Math.round(carried() * 100) + '% 채웠어요'
+                         : chargeHint(w)) + '</div>' +
             '</div>' +
           '</div>' +
         '</div>' +
@@ -79,7 +89,8 @@ var TimerView = (function () {
       '</div>' +
 
       '<div id="t-act-idle" class="btn-wrap" style="margin-top:12px"' + (running ? ' hidden' : '') + '>' +
-        '<button class="btn btn-primary" id="t-start">' + UI.ICON.play + '나갈게요</button>' +
+        '<button class="btn btn-primary" id="t-start"' + (stop ? ' disabled' : '') + '>' + UI.ICON.play +
+          (stop ? '오늘은 여기까지예요' : carried() >= 1 ? '더 쬘래요' : '나갈게요') + '</button>' +
       '</div>' +
       '<div id="t-act-run" class="btn-row" style="margin-top:12px"' + (running ? '' : ' hidden') + '>' +
         '<button class="btn btn-sub" id="t-stop">그만할래요</button>' +
@@ -94,6 +105,8 @@ var TimerView = (function () {
   function label(running, s, p) {
     if (running) return s.limitLabel + ' 기준 남은 시간';
     if (!p || !isFinite(p.minutes)) return '지금은 나가도 효과가 없어요';
+    if (carried() >= 1) return '오늘 필요한 양은 다 채웠어요';
+    if (carried() > 0) return '오늘 채우고 남은 시간';
     if (rx && rx.activeWindow) return '지금 나가면 필요한 시간';
     if (rx && rx.targetWindow) return '다음에 쬘 시간';
     if (rx && rx.tomorrow && rx.tomorrow.window) return '내일 쬘 시간';
@@ -134,6 +147,10 @@ var TimerView = (function () {
 
     q('t-start').onclick = function () {
       if (!rx) return UI.toast('예보를 불러오는 중이에요');
+      var over = TimerService.exhausted(rx);
+      if (over) return UI.toast(over === 'heat'
+        ? '오늘은 더위 한계까지 다 쬐었어요 — 내일 다시 해요'
+        : '오늘은 화상 한계까지 다 쬐었어요 — 내일 다시 해요');
       TimerService.start(rx, rx.activeWindow || rx.targetWindow);
       q('t-act-idle').hidden = true;
       q('t-act-run').hidden = false;
@@ -166,7 +183,7 @@ var TimerView = (function () {
       rx = App.prescription() || rx;
       var pt = previewPoint();
       document.getElementById('t-clock').textContent =
-        clock(pt && isFinite(pt.minutes) ? Math.round(pt.minutes * 60) : null);
+        clock(pt && isFinite(pt.minutes) ? Math.round(pt.minutes * 60 * (1 - carried())) : null);
       document.getElementById('t-live').innerHTML = liveText(false, null, pt);
     }
   }
@@ -205,6 +222,17 @@ var TimerView = (function () {
 
     var body = '이 조건에서 필요한 시간 <b>' + UI.mins(p.vitd) + '</b>' +
       (running ? ' · 경과 <b>' + Math.floor(s.elapsedSec / 60) + '분 ' + (s.elapsedSec % 60) + '초</b>' : '');
+    if (running && s.extra) {
+      body += '<br>오늘 목표는 이미 채웠어요 — 지금부터는 <b>안전 한계</b>까지 남은 시간이에요';
+    } else if (running && s.carriedPercent > 0) {
+      body += '<br>아까 쬔 <b>' + s.carriedPercent + '%</b>에 이어서 채우는 중이에요';
+    } else if (!running && rx && TimerService.exhausted(rx)) {
+      body += '<br>오늘 쬘 수 있는 <b>안전 한계</b>까지 다 쓰셨어요 — 내일 다시 시작해요';
+    } else if (!running && carried() >= 1) {
+      body += '<br>오늘은 <b>' + Math.round(carried() * 100) + '%</b>로 다 채웠어요 · 더 쬐면 그만큼 따로 기록돼요';
+    } else if (!running && carried() > 0) {
+      body += '<br>오늘 이미 <b>' + Math.round(carried() * 100) + '%</b>를 채워서, 남은 만큼만 쬐면 돼요';
+    }
 
     /* 안전 한계가 목표보다 먼저 오면, 이 차림으로는 목표를 못 채운다는 걸 분명히 말해 준다.
        (노출 면적이 적을수록 필요시간은 길어지는데 화상 한계는 그대로라서 생기는 상황) */

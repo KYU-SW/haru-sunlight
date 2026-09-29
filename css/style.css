@@ -639,9 +639,9 @@ svg { display:block; flex:none; }
 .ob-step { font-size:12.5px; font-weight:800; color:var(--blue); margin-bottom:10px; }
 .ob-q { font-size:25px; font-weight:800; line-height:1.4; letter-spacing:-0.41px; }
 .ob-help { font-size:14px; color:var(--g500); margin-top:10px; line-height:1.55; font-weight:500; }
-.ob-opts { margin-top:26px; display:flex; flex-direction:column; gap:9px; }
+.ob-opts { margin-top:22px; display:flex; flex-direction:column; gap:8px; }
 .ob-opt {
-  width:100%; text-align:left; padding:16px; border-radius:var(--r-in);
+  width:100%; text-align:left; padding:13px 16px; border-radius:var(--r-in);
   background:var(--surface); box-shadow:var(--sh-btn); transition:.16s var(--ease);
   display:flex; align-items:center; gap:13px;
 }
@@ -650,6 +650,9 @@ svg { display:block; flex:none; }
 .ob-opt em { font-size:22px; font-style:normal; flex:none; }
 .ob-opt-t { font-size:15px; font-weight:700; letter-spacing:-0.14px; }
 .ob-opt.on .ob-opt-t { color:#fff; }
+.ob-opt .ob-opt-n { width:28px; height:28px; border-radius:50%; background:var(--g100, #f2f4f6); display:flex; align-items:center; justify-content:center; font-size:14px; font-weight:800; color:var(--g700, #4e5968); }
+.ob-opt.on .ob-opt-n { background:var(--blue); color:#fff; }
+.ob-unsure { display:block; margin:12px auto 0; padding:6px 10px; background:none; border:0; font-size:13px; font-weight:600; color:var(--g500); text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
 .ob-opt-d { font-size:12px; color:var(--g500); margin-top:3px; font-weight:500; }
 .ob-opt.on .ob-opt-d { color:rgba(255,255,255,.82); }
 .ob-time {
@@ -1404,3 +1407,182 @@ html, body, #app, .phone,
 /* 토스트 — left:50% 때문에 폭이 화면 절반으로 묶여 "요"만 다음 줄로 떨어지던 문제.
    글 길이만큼 넓히고(최대 화면 폭 − 40px), 줄이 바뀌어도 단어 단위로만 끊는다. */
 #toast { width:max-content; max-width:calc(100% - 40px); word-break:keep-all; text-align:center; }
+
+/* =========================================================
+   타이머 화면 — 연한 파랑 면을 쓰지 않는다.
+   흰 바탕 위에 옅은 회색 선으로만 구분한다.
+   ========================================================= */
+#screen-timer .timer-card,
+#screen-timer .tstat,
+#screen-timer .tstat-duo,
+#screen-timer .tnote,
+#screen-timer .sec {
+  background:#fff; border:1px solid var(--hair); box-shadow:none;
+}
+#screen-timer .tstat.on { background:var(--blue); border-color:var(--blue); }
+/* 대기 중 배지 · 옷차림 버튼도 흰 바탕이라 선으로 테두리를 준다 */
+#screen-timer .top-mode.mode-cloudy { background:#fff; border:1px solid var(--hair); }
+#screen-timer .seg button:not(.on) { background:#fff; border:1px solid var(--hair); }
+
+
+/* =========================================================
+   스탬프 — 마이페이지 '내 정보' 위 · 이번 주 일곱 칸
+   ========================================================= */
+.stp { padding:16px 16px 4px; }
+.stp-h { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+.stp-lab { font-size:12.5px; font-weight:700; color:var(--ink-3); }
+.stp-big { display:flex; align-items:baseline; gap:6px; margin-top:2px; }
+.stp-big b { font-size:30px; font-weight:800; letter-spacing:-0.04em; font-variant-numeric:tabular-nums; }
+.stp-big span { font-size:13.5px; font-weight:600; color:var(--ink-3); }
+.stp-streak { display:inline-flex; padding:5px 10px; border-radius:99px; background:#EAF0FF;
+  color:#1B4ED1; font-size:11.5px; font-weight:800; white-space:nowrap; }
+
+.stp-week { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-top:13px; }
+.stp-d { display:flex; flex-direction:column; align-items:center; gap:6px; }
+.stp-dow { font-size:10.5px; font-weight:700; color:var(--ink-3); }
+.stp-d.now .stp-dow { color:#326CF9; }
+.stp-m { width:100%; max-width:40px; aspect-ratio:1; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; color:#F5A524; }
+.stp-m.off { background:#fff; border:1px solid var(--hair); }
+.stp-m.today { background:#fff; border:1.5px dashed #326CF9; }
+.stp-svg { width:100%; height:100%; display:block; }
+
+.stp-more { width:100%; margin-top:12px; padding:13px; border-top:1px solid var(--hair);
+  color:#326CF9; font-size:13.5px; font-weight:800; }
+.stp-more:active { background:#F3F6FB; }
+
+/* 한 달 치 시트 */
+.stp-sh-h { display:flex; align-items:baseline; justify-content:space-between; margin:4px 0 14px; }
+.stp-sh-t { font-size:17px; font-weight:800; letter-spacing:-0.03em; }
+.stp-sh-v { font-size:13px; font-weight:800; color:#326CF9; }
+.stp-grid { display:grid; grid-template-columns:repeat(7,minmax(0,1fr)); gap:7px; width:100%; }
+.stp-gd { font-size:10.5px; font-weight:700; color:var(--ink-3); text-align:center; padding-bottom:2px; }
+/* 못 채운 날 — 시트 바탕(연회색)과 같은 색이면 칸이 안 보인다. 한 톤 더 진하게. */
+.stp-c { aspect-ratio:1; min-width:0; border-radius:12px; background:rgba(19,26,43,.06); display:flex;
+  align-items:center; justify-content:center; font-size:11.5px; font-weight:700; color:var(--ink-3);
+  font-variant-numeric:tabular-nums; }
+.stp-c.pad { background:none; }
+.stp-c.on { background:#fff; border:1px solid var(--hair); padding:5px; color:#F5A524; }
+.stp-c.today { box-shadow:inset 0 0 0 1.5px #326CF9; color:#326CF9; }
+/* 오늘 칸에도 도장이 찍혔으면 도장 색은 그대로 두고 테두리로만 표시한다 */
+.stp-c.on.today { color:#F5A524; }
+.stp-svg { max-width:100%; }
+.stp-legend { display:flex; gap:16px; margin-top:16px; padding-top:14px; border-top:1px solid var(--hair);
+  font-size:12.5px; font-weight:600; color:var(--ink-3); }
+.stp-legend span { display:inline-flex; align-items:center; gap:7px; }
+/* 범례 표시는 달력 칸과 같은 모양으로 — 둥근 네모 */
+.stp-lg { width:22px; height:22px; border-radius:7px; background:rgba(19,26,43,.06); display:flex;
+  align-items:center; justify-content:center; color:var(--ink-3); font-size:11px; font-weight:700; }
+.stp-lg.on { background:#fff; border:1px solid var(--hair); padding:2px; color:#F5A524; }
+
+
+/* =========================================================
+   동의 화면 — 온보딩과 같은 틀 · 항목은 표처럼 한 줄씩
+   ========================================================= */
+.cs-list { margin:22px 0 0; border-top:1px solid var(--hair); }
+.cs-row { display:grid; grid-template-columns:100px 1fr; gap:12px; padding:12px 2px;
+  border-bottom:1px solid var(--hair); font-size:13.5px; line-height:1.6; word-break:keep-all; }
+.cs-row dt { font-weight:800; color:var(--ink); }
+.cs-row dd { margin:0; color:var(--ink-2); font-weight:500; }
+.cs-checks { margin-top:18px; display:flex; flex-direction:column; gap:9px; }
+.cs-check { display:flex; align-items:center; gap:11px; padding:14px 16px; border-radius:14px;
+  border:1px solid var(--hair); background:#fff; font-size:14.5px; font-weight:700; color:var(--ink); cursor:pointer; }
+.cs-check input { width:20px; height:20px; margin:0; flex:none; accent-color:#326CF9; }
+.cs-check:has(input:checked) { border-color:#326CF9; background:#F3F7FF; }
+.ob-help b { color:var(--ink); font-weight:700; }
+
+/* 시간 범위 줄표 — 큰 숫자의 좁은 자간 때문에 숫자에 붙어 보이지 않게 양옆을 조금 띄운다 */
+.ha-big .ha-dash { margin:0 0.14em; }
+
+/* 한국어 줄바꿈 — 단어 중간("채웁니/다")에서 끊지 않고 띄어쓰기 단위로 넘긴다.
+   공백 없는 긴 문자열(주소·ID)은 넘칠 때만 끊는다. */
+body { word-break:keep-all; overflow-wrap:break-word; }
+
+/* 시작 화면 — 두 번째 버튼(회원가입). 연한 파랑 바탕 + 파란 글자 (지침서 1절의 보조 버튼 색) */
+.lg-btn2 { margin-top:10px; background:#EAF0FF; color:#326CF9; border-radius:12px; font-size:16.5px; }
+.lg-btn2:active { background:#E3ECFF; }
+.lg-foot .ob-skip { margin-top:4px; }
+
+/* 로그인 · 회원가입 입력 — 온보딩 틀 + 검색칸 모양(.st-search) 재사용 */
+.lg-form { margin-top:22px; display:flex; flex-direction:column; gap:10px; }
+.lg-field { margin-top:0; }
+.lg-link { margin-top:14px; padding:4px 2px; font-size:13.5px; font-weight:600; color:var(--ink-3);
+  text-decoration:underline; text-underline-offset:3px; }
+#login .btn:disabled { opacity:.6; }
+/* 로그인·동의·온보딩 화면에서는 아래쪽에 큰 버튼이 있어 알림 문구를 그 위로 올린다 */
+body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(186px + var(--safe-b)); }
+
+/* =========================================================
+   로그인 — 하늘 + 시트 (시안 1)
+   위 46%는 하늘, 아래는 흰 시트. 해가 시트 뒤에서 떠오른다.
+   하늘색은 시각에 따라 네 가지(lg2-morning · day · evening · night).
+   ========================================================= */
+#login:has(.lg2) { background:#2F66F0; }
+/* 하늘 — 해는 두지 않는다. 아래로 갈수록 옅어져 흰 입력 시트로 자연스럽게 이어진다.
+   시간대에 따라 색만 바뀐다(아침·낮·저녁·밤). */
+.lg2 { --sky1:#2F66F0; --sky2:#5E8BFF; --sky3:#DCE8FF;
+  position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden;
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 42%,var(--sky3) 78%,#fff 100%); }
+.lg2-morning { --sky1:#4F7BF2; --sky2:#8FB0FF; --sky3:#E4EDFF; }
+.lg2-evening { --sky1:#3A4FC7; --sky2:#7E94E8; --sky3:#DCE4FF; }
+.lg2-night   { --sky1:#101A3D; --sky2:#27377A; --sky3:#8E9AD0; }
+
+.lg2-sky { position:absolute; left:0; right:0; top:0; height:48%; pointer-events:none; }
+.lg2-night .lg2-sky::before { content:''; position:absolute; inset:0;
+  background-image:radial-gradient(1.5px 1.5px at 18% 22%,#fff,transparent),radial-gradient(1px 1px at 72% 14%,#fff,transparent),
+    radial-gradient(1.5px 1.5px at 84% 38%,#fff,transparent),radial-gradient(1px 1px at 34% 44%,#fff,transparent),
+    radial-gradient(1px 1px at 58% 30%,#fff,transparent); opacity:.8; }
+
+.lg2-head { position:relative; padding:calc(58px + var(--safe-t, 0px)) 26px 0; color:#fff; }
+.lg2-brand { display:flex; align-items:center; gap:11px; }
+.lg2-logo { width:46px; height:46px; border-radius:14px; flex:none; }
+.lg2-title { font-size:34px; font-weight:900; letter-spacing:-0.06em; margin:0; text-shadow:0 2px 14px rgba(10,30,90,.18); }
+.lg2-close { position:absolute; right:18px; top:calc(52px + var(--safe-t, 0px)); width:40px; height:40px; border-radius:50%;
+  background:rgba(255,255,255,.18); color:#fff; display:flex; align-items:center; justify-content:center; }
+.lg2-close svg { width:18px; height:18px; }
+.lg2-prev { right:auto; left:14px; top:calc(44px + var(--safe-t, 0px)); background:transparent; }
+.lg2-head:has(.lg2-prev) { padding-top:calc(92px + var(--safe-t, 0px)); }
+.lg2-prev svg { width:20px; height:20px; }
+
+.lg2-sheet { position:relative; margin-top:auto; min-height:56%; background:#fff; border-radius:28px 28px 0 0;
+  padding:24px 22px calc(20px + var(--safe-b, 0px)); display:flex; flex-direction:column;
+  box-shadow:0 -12px 30px rgba(10,30,90,.12); animation:lgSheet .55s cubic-bezier(.2,.8,.25,1) .1s both; }
+@keyframes lgSheet { from { transform:translateY(40px); opacity:0; } to { transform:none; opacity:1; } }
+
+.lg2-tabs { position:relative; display:flex; background:#F1F4F9; border-radius:14px; padding:4px; }
+.lg2-tabs button { position:relative; z-index:1; flex:1; padding:10px 0; font-size:14.5px; font-weight:700; color:#8B94A6; transition:color .2s; }
+.lg2-tabs button.on { color:#131A2B; }
+.lg2-tab-bar { position:absolute; top:4px; bottom:4px; left:4px; width:calc(50% - 4px); border-radius:11px; background:#fff;
+  box-shadow:0 1px 4px rgba(19,26,43,.12); transition:transform .25s cubic-bezier(.2,.8,.25,1); }
+.lg2-tab-bar.signup { transform:translateX(100%); }
+
+.lg2-form { margin-top:16px; display:flex; flex-direction:column; gap:10px; }
+.lg2-field { display:flex; align-items:center; gap:10px; height:54px; padding:0 8px 0 16px; border-radius:15px;
+  background:#fff; box-shadow:inset 0 0 0 1px rgba(19,26,43,.12); color:#9AA3B2; cursor:text; transition:box-shadow .15s; }
+.lg2-field:focus-within { box-shadow:inset 0 0 0 1.6px #326CF9; color:#326CF9; }
+.lg2-field > svg { width:19px; height:19px; flex:none; }
+.lg2-field input { flex:1; min-width:0; border:0; outline:0; background:transparent; font:inherit; font-size:16px; font-weight:500; color:#131A2B; }
+.lg2-field input::placeholder { color:#9AA3B2; }
+.lg2-eye { width:38px; height:38px; flex:none; border-radius:10px; display:flex; align-items:center; justify-content:center; color:#B0B8C6; }
+.lg2-eye svg { width:19px; height:19px; }
+.lg2-eye.on { color:#326CF9; }
+
+.lg2-link { align-self:flex-end; margin-top:10px; padding:4px 2px; font-size:13px; font-weight:600; color:#8B94A6; }
+.lg2-checks { display:flex; gap:14px; margin-top:12px; padding-left:4px; }
+.lg2-checks span { display:flex; align-items:center; gap:5px; font-size:12.5px; font-weight:600; color:#A3ABBA; transition:color .2s; }
+.lg2-checks span::before { content:''; width:15px; height:15px; border-radius:50%; background:#E7EBF2;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 8.2l2.2 2.2 4.8-4.8' fill='none' stroke='%23fff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-size:100%; transition:background-color .2s; }
+.lg2-checks span.ok { color:#1E9E62; }
+.lg2-checks span.ok::before { background-color:#22B573; }
+
+.lg2-sp { flex:1; min-height:18px; }
+.lg2-submit { height:54px; border-radius:15px; font-size:16px; }
+.lg2-guest { margin-top:12px; padding:10px; text-align:center; font-size:13.5px; font-weight:600; color:#8B94A6; }
+.lg2-guest b { color:#326CF9; font-weight:800; }
+.lg2-offline { margin:6px 0 0; font-size:14.5px; line-height:1.6; color:#4A5568; text-align:center; }
+.lg2-modal .lg2-sheet { min-height:60%; }
+
+@media (prefers-reduced-motion: reduce) {
+  .lg2-sheet { animation:none; }
+}

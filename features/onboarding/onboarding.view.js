@@ -54,16 +54,16 @@ var OnboardingView = (function () {
     return '' +
       '<div class="ob-step">1 / ' + S.total() + '</div>' +
       '<div class="ob-q">여름에 팔뚝을<br>30분 쬐면 어떻게 되나요?</div>' +
-      '<div class="ob-help">피부 타입에 따라 필요한 시간이 4배까지 차이 나요.</div>' +
+      '<div class="ob-help">피부 타입에 따라 필요한 시간이 5배까지 차이 나요.</div>' +
       '<div class="ob-opts">' +
         S.SKIN_OPTIONS.map(function (o, i) {
           return '<button class="ob-opt' + (S.state.skinIndex === i ? ' on' : '') + '" data-i="' + i + '">' +
-                   '<em>' + o.emoji + '</em>' +
-                   '<div><div class="ob-opt-t">' + o.title + '</div>' +
-                   '<div class="ob-opt-d">' + o.desc + '</div></div>' +
+                   '<em class="ob-opt-n">' + o.label + '</em>' +
+                   '<div><div class="ob-opt-t">' + o.title + '</div></div>' +
                  '</button>';
         }).join('') +
       '</div>' +
+      '<button class="ob-unsure" id="ob-unsure">잘 모르겠어요 · 타입 Ⅲ으로 시작</button>' +
       '<div class="ob-tip"><b>유리창 너머 햇빛은 소용없어요.</b><br>' +
         '비타민D를 만드는 자외선(UVB)은 유리를 통과하지 못해요. 꼭 밖에서 쬐세요.</div>';
   }
@@ -95,7 +95,7 @@ var OnboardingView = (function () {
     return '' +
       '<div class="ob-step">2 / ' + S.total() + '</div>' +
       '<div class="ob-q">어디 계세요?</div>' +
-      '<div class="ob-help">그 지역 기상청 예보로 계산해요. 위치는 이 기기에만 저장돼요.</div>' +
+      '<div class="ob-help">그 지역 기상청 예보로 계산해요. 정확한 위치는 이 기기에만 남고, 보내더라도 시·도 이름뿐이에요.</div>' +
       (l ? '<div class="ob-picked">' + (cur ? areaLabel(cur) : UI.esc(l.name)) +
              (l.precise ? ' · 현재 위치' : '') + '</div>' : '') +
       '<button class="st-geo" id="ob-geo" style="margin-top:18px">' + UI.ICON.pin +
@@ -122,6 +122,7 @@ var OnboardingView = (function () {
       if (!S.canNext()) return;
       if (S.state.step === S.total() - 1) {
         S.complete();
+        if (window.Sync) Sync.run();   // 피부 타입·시도를 사용자 정보에 반영 (동의했을 때만)
         hide();
         App.boot();
       } else { S.next(); render(); }
@@ -133,6 +134,9 @@ var OnboardingView = (function () {
       [].forEach.call(root.querySelectorAll('.ob-opt'), function (b) {
         b.onclick = function () { S.pickSkin(+b.dataset.i); render(); };
       });
+      document.getElementById('ob-unsure').onclick = function () {
+        S.pickSkin(S.UNSURE_INDEX); S.next(); render();
+      };
     }
     if (step === 'location') {
       var input = document.getElementById('ob-q');

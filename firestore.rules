@@ -1,0 +1,47 @@
+// =========================================================
+// 하루햇빛 — Firestore 보안 규칙 (작업지시서 7절)
+// Firebase 콘솔 › Firestore Database › 규칙 탭에 이 내용을 붙여 넣고 [게시]한다.
+// 관리자 이메일 두 곳은 팀에서 정한 구글 계정으로 바꾼다. 정하기 전에는 그대로 두면
+// 관리자 조회만 막히고 앱의 업로드는 정상 동작한다.
+// =========================================================
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() { return request.auth != null; }
+
+    // 관리자 = 아래 이메일로 구글 로그인한 사람
+    function isAdmin() {
+      return signedIn()
+        && request.auth.token.get('email', '') in ['관리자1@gmail.com', '관리자2@gmail.com']
+        && request.auth.token.get('email_verified', false) == true;
+    }
+
+    match /users/{uid} {
+      allow create, update: if signedIn()
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(
+             ['createdAt','updatedAt','consentedAt','consentVersion','skinType','sido','notify','appVersion']);
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow delete: if false;
+    }
+
+    match /sessions/{docId} {
+      allow create: if signedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.keys().hasOnly(
+             ['uid','dateKey','at','minutes','percent','clothing','limitedBy','endedBy','uploadedAt'])
+        && request.resource.data.minutes is int
+        && request.resource.data.minutes >= 1 && request.resource.data.minutes <= 600
+        && request.resource.data.percent is int
+        && request.resource.data.percent >= 0 && request.resource.data.percent <= 300
+        && request.resource.data.clothing in ['shortShort','shortLong','longLong']
+        && request.resource.data.limitedBy in ['vitd','burn','heat'];
+      allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
+      allow update, delete: if false;   // 한 번 쓴 기록은 고치거나 지우지 못한다
+    }
+
+    // 그 외는 전부 막음
+    match /{document=**} { allow read, write: if false; }
+  }
+}

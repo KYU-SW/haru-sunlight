@@ -22,6 +22,8 @@ var SettingsView = (function () {
       '<div class="ha-wrap">' +
         recordCard() +
 
+        StampView.card(StampService.model()) +
+
         group('내 정보',
           navRow('s-body-skin', '피부 타입', '타입 ' + skin) +
           navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '')) +
@@ -31,6 +33,12 @@ var SettingsView = (function () {
 
         group('위치',
           navRow('s-region', '지역', m.location ? UI.esc(m.location.name) : '설정 안 됨')) +
+
+        accountGroup() +
+
+        group('기록 전송',
+          toggleRow('s-send', '평가에 기록 보내기', ConsentService.given()) +
+          infoRow('s-uid', '기기 ID', uidText())) +
       '</div>';
 
     bind();
@@ -69,6 +77,31 @@ var SettingsView = (function () {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="st-v">' + value + UI.ICON.right + '</span></button>';
   }
+  /* ---------- 계정 — 로그인 상태 · 로그인/회원가입/로그아웃 ----------
+     Firebase를 못 불러오면 묶음째 숨긴다(게스트로만 쓰는 상태). */
+  function accountGroup() {
+    if (!Auth.available()) return '';
+    return group('계정',
+      Auth.isMember()
+        ? infoRow('s-acct', '이메일', UI.esc(Auth.email())) +
+          '<button class="st-row" id="s-logout"><span class="st-l">로그아웃</span></button>'
+        : navRow('s-login', '로그인', '게스트') +
+          navRow('s-signup', '회원가입', ''));
+  }
+
+  function infoRow(id, label, value) {
+    return '<div class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
+      '<span class="st-v">' + value + '</span></div>';
+  }
+
+  /* 익명 로그인 uid — 앞 6자리만 보여 준다. 삭제를 요청할 때 불러 주는 번호다 (6절) */
+  function uidText() {
+    var id = Auth.uid();
+    if (id) return id.slice(0, 6);
+    if (!ConsentService.given()) return '없음';
+    return Auth.available() ? '연결 중…' : '연결 안 됨';
+  }
+
   function toggleRow(id, label, on) {
     return '<button class="st-row" id="' + id + '"><span class="st-l">' + label + '</span>' +
       '<span class="sw' + (on ? ' on' : '') + '"></span></button>';
@@ -196,10 +229,37 @@ var SettingsView = (function () {
     var q = function (id) { return document.getElementById(id); };
 
     q('s-history').onclick = function () { WeeklyView.open('log'); };
+    if (q('s-stamp-more')) q('s-stamp-more').onclick = function () { StampView.openMonth(); };
     q('s-analysis').onclick = function () { WeeklyView.open('analysis'); };
     q('s-body-skin').onclick = q('s-body-cloth').onclick =
       function () { bodyInfoSheet(); };
     q('s-region').onclick = function () { regionSheet(); };
+
+    /* 기록 전송 — 끌 때는 바로, 켤 때는 동의 내용을 다시 보여 주고 받는다.
+       끄면 앞으로 올리지 않는다. 이미 올린 기록은 기기 ID로 삭제를 요청받는다(6절). */
+    q('s-send').onclick = function () {
+      if (ConsentService.given()) {
+        ConsentService.decline();
+        UI.toast('기록 전송을 껐어요');
+        render();
+      } else {
+        ConsentView.sheet(function () {
+          UI.toast('기록 전송을 켰어요');
+          render();
+        });
+      }
+    };
+
+    /* 게스트 → 계정: 회원가입하면 쓰던 익명 uid를 그대로 이어 받는다(Auth.signUpEmail) */
+    if (q('s-login')) q('s-login').onclick = function () { LoginView.openFromSettings('login'); };
+    if (q('s-signup')) q('s-signup').onclick = function () { LoginView.openFromSettings('signup'); };
+    /* 로그아웃해도 기기에 저장된 기록·설정은 그대로다. 이후에는 게스트로 쓴다. */
+    if (q('s-logout')) q('s-logout').onclick = function () {
+      Auth.signOut().then(function () {
+        UI.toast('로그아웃했어요 · 게스트로 계속 써요');
+        render();
+      });
+    };
 
     q('s-notify').onclick = function () {
       if (!Notify.supported()) return UI.toast('이 브라우저는 알림을 지원하지 않아요');
@@ -212,9 +272,18 @@ var SettingsView = (function () {
     };
   }
 
+  /* 로그인이 늦게 끝나거나 로그인·로그아웃하면 기기 ID와 계정 줄이 따라 바뀌게 */
+  Auth.onChange(function () {
+    var row = document.querySelector('#s-uid .st-v');
+    if (row) row.textContent = uidText();
+    var scr = document.getElementById('screen-settings');
+    if (scr && scr.classList.contains('active')) render();
+  });
+
   /* 설정이 바뀌면 처방을 다시 계산해야 한다 (아키텍처: 설정 변경 시 재계산) */
   function after() {
     App.invalidate();
+    if (window.Sync) Sync.run();
     render();
   }
 
