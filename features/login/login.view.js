@@ -223,6 +223,15 @@ var LoginView = (function () {
 
     (mode === 'signup' ? Auth.signUpEmail(email, pw) : Auth.signInEmail(email, pw))
       .then(function () {
+        /* 관리자 계정이면 앱 대신 관리자 대시보드로 간다 (가입은 해당 없음) */
+        return mode === 'login' ? Auth.checkAdmin() : false;
+      })
+      .then(function (isAdmin) {
+        if (isAdmin) {
+          UI.toast('관리자로 로그인했어요');
+          location.href = 'admin.html';
+          return;
+        }
         UI.toast(mode === 'signup' ? '가입했어요' : '로그인했어요');
         if (fromSettings) {
           hide();

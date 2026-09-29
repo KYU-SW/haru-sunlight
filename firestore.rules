@@ -1,8 +1,8 @@
 // =========================================================
 // 하루햇빛 — Firestore 보안 규칙 (작업지시서 7절)
 // Firebase 콘솔 › Firestore Database › 규칙 탭에 이 내용을 붙여 넣고 [게시]한다.
-// 관리자 이메일 두 곳은 팀에서 정한 구글 계정으로 바꾼다. 정하기 전에는 그대로 두면
-// 관리자 조회만 막히고 앱의 업로드는 정상 동작한다.
+// 관리자 계정은 콘솔에서 먼저 만든다(아래 isAdmin). 만들기 전에는 관리자 조회만 막히고
+// 앱의 업로드는 정상 동작한다.
 // =========================================================
 rules_version = '2';
 service cloud.firestore {
@@ -10,11 +10,12 @@ service cloud.firestore {
 
     function signedIn() { return request.auth != null; }
 
-    // 관리자 = 아래 이메일로 구글 로그인한 사람
+    // 관리자 = Firebase 콘솔(Authentication › 사용자 추가)에서 만든 관리자 계정
+    // 앱·관리자 페이지에서 아이디 'admin' 으로 로그인하면 admin@haru-sunlight.firebaseapp.com 로 바뀐다.
+    // 관리자를 늘리려면 콘솔에서 계정을 더 만들고 이 목록에 넣는다.
     function isAdmin() {
       return signedIn()
-        && request.auth.token.get('email', '') in ['관리자1@gmail.com', '관리자2@gmail.com']
-        && request.auth.token.get('email_verified', false) == true;
+        && request.auth.token.get('email', '') in ['admin@haru-sunlight.firebaseapp.com'];
     }
 
     match /users/{uid} {

@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>하루 햇빛 관리자</title>
+<link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+<!-- 관리자 대시보드 — 기대효과 평가 계획(3·4·5절)의 지표를 보여 준다.
+     앱과 따로 연다: 배포 주소 뒤에 /admin.html -->
+<div id="admin"></div>
+<div class="ad-toast" id="ad-toast" role="status"></div>
+
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="features/admin/admin.stats.js"></script>
+<script src="features/admin/admin.demo.js"></script>
+<script src="features/admin/admin.view.js"></script>
+<script>AdminView.start();</script>
+</body>
+</html>
