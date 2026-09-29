@@ -13,7 +13,7 @@
    ========================================================= */
 var Sync = (function () {
 
-  var APP_VERSION = 'v_0.3';
+  var APP_VERSION = 'v_0.4';
   var KEY_UP = 'sunrx.uploaded';        // 올린 문서 ID 목록
   var KEY_USER = 'sunrx.userSynced';    // users 문서를 처음 만든 uid (createdAt을 한 번만 넣으려고)
   var CLOTHES = ['shortShort', 'shortLong', 'longLong'];
