@@ -67,12 +67,13 @@ var LoginView = (function () {
 
   /* ---------- 하늘 — 지금 시각에 따라 색과 해 높이가 바뀐다 ----------
      아침(5–10시) · 낮(10–16시) · 저녁(16–19시) · 밤. 해는 시트 뒤에서 떠오른다. */
+  /* 시간대에 따라 하늘색만 바꾼다 (인사말은 두지 않는다) */
   function skyPhase() {
     var h = new Date().getHours();
-    if (h >= 5 && h < 10)  return { key: 'morning', greet: '좋은 아침이에요' };
-    if (h >= 10 && h < 16) return { key: 'day',     greet: '오늘도 해가 떴어요' };
-    if (h >= 16 && h < 19) return { key: 'evening', greet: '해가 기울고 있어요' };
-    return { key: 'night', greet: '내일 해를 기다려요' };
+    if (h >= 5 && h < 10)  return { key: 'morning' };
+    if (h >= 10 && h < 16) return { key: 'day' };
+    if (h >= 16 && h < 19) return { key: 'evening' };
+    return { key: 'night' };
   }
 
   function screenHtml() {
@@ -83,12 +84,12 @@ var LoginView = (function () {
 
     return '<div class="lg2 lg2-' + ph.key + (fromSettings ? ' lg2-modal' : '') + '">' +
       '<div class="lg2-sky" aria-hidden="true">' +
-        '<div class="lg2-sun"></div>' +
-        '<div class="lg2-ray r1"></div><div class="lg2-ray r2"></div>' +
       '</div>' +
       '<div class="lg2-head">' +
-        '<h1 class="lg2-title">하루햇빛</h1>' +
-        '<p class="lg2-greet">' + ph.greet + '</p>' +
+        '<div class="lg2-brand">' +
+          '<h1 class="lg2-title">하루햇빛</h1>' +
+          '<img class="lg2-logo" src="icon.svg" alt="" aria-hidden="true">' +
+        '</div>' +
         (fromSettings
           ? '<button class="lg2-close" id="lg-back" aria-label="닫기">' + closeIcon() + '</button>'
           : '<button class="lg2-close lg2-prev" id="lg-back" aria-label="이전">' + backIcon() + '</button>') +
@@ -219,7 +220,6 @@ var LoginView = (function () {
     var label = btn.textContent;
     btn.disabled = true;
     btn.textContent = mode === 'signup' ? '가입하는 중…' : '로그인 중…';
-    root.querySelector('.lg2').classList.add('busy');
 
     (mode === 'signup' ? Auth.signUpEmail(email, pw) : Auth.signInEmail(email, pw))
       .then(function () {
@@ -235,7 +235,6 @@ var LoginView = (function () {
       .catch(function (e) {
         busy = false;
         btn.disabled = false;
-        root.querySelector('.lg2').classList.remove('busy');
         btn.textContent = label;
         var msg = Auth.errorText(e);
         if (msg) UI.toast(msg);

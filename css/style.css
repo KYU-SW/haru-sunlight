@@ -1518,31 +1518,25 @@ body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(18
    하늘색은 시각에 따라 네 가지(lg2-morning · day · evening · night).
    ========================================================= */
 #login:has(.lg2) { background:#2F66F0; }
-.lg2 { --sky1:#2F66F0; --sky2:#5E8BFF; --sky3:#FFD48A; --sun1:#FFF1B0; --sun2:#F8CB45; --glow:rgba(255,228,128,.26);
+/* 하늘 — 해는 두지 않는다. 아래로 갈수록 옅어져 흰 입력 시트로 자연스럽게 이어진다.
+   시간대에 따라 색만 바뀐다(아침·낮·저녁·밤). */
+.lg2 { --sky1:#2F66F0; --sky2:#5E8BFF; --sky3:#DCE8FF;
   position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden;
-  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 30%,var(--sky3) 48%,var(--sky3) 100%); }
-.lg2-morning { --sky1:#4F7BF2; --sky2:#8FB0FF; --sky3:#FFD2A8; --sun1:#FFF4C9; --sun2:#FFC56B; }
-.lg2-evening { --sky1:#3A4FC7; --sky2:#B071C9; --sky3:#FFA37A; --sun1:#FFD9A0; --sun2:#FF8A4C; --glow:rgba(255,150,90,.26); }
-.lg2-night   { --sky1:#101A3D; --sky2:#27377A; --sky3:#4A5AA8; --sun1:#FFF6D8; --sun2:#E7E3C8; --glow:rgba(255,246,216,.14); }
+  background:linear-gradient(180deg,var(--sky1) 0%,var(--sky2) 42%,var(--sky3) 78%,#fff 100%); }
+.lg2-morning { --sky1:#4F7BF2; --sky2:#8FB0FF; --sky3:#E4EDFF; }
+.lg2-evening { --sky1:#3A4FC7; --sky2:#7E94E8; --sky3:#DCE4FF; }
+.lg2-night   { --sky1:#101A3D; --sky2:#27377A; --sky3:#8E9AD0; }
 
 .lg2-sky { position:absolute; left:0; right:0; top:0; height:48%; pointer-events:none; }
-.lg2-sun { position:absolute; left:50%; bottom:-78px; width:190px; height:190px; margin-left:-95px; border-radius:50%;
-  background:radial-gradient(circle at 50% 38%,var(--sun1),var(--sun2) 72%);
-  box-shadow:0 0 0 22px var(--glow), 0 0 0 52px var(--glow);
-  animation:lgRise 1.1s cubic-bezier(.2,.8,.25,1) both; }
-.lg2-ray { position:absolute; left:50%; bottom:-78px; width:190px; height:190px; margin-left:-95px; border-radius:50%;
-  border:1.5px solid rgba(255,255,255,.28); animation:lgPulse 4.5s ease-out infinite; }
-.lg2-ray.r2 { animation-delay:2.25s; }
 .lg2-night .lg2-sky::before { content:''; position:absolute; inset:0;
   background-image:radial-gradient(1.5px 1.5px at 18% 22%,#fff,transparent),radial-gradient(1px 1px at 72% 14%,#fff,transparent),
     radial-gradient(1.5px 1.5px at 84% 38%,#fff,transparent),radial-gradient(1px 1px at 34% 44%,#fff,transparent),
     radial-gradient(1px 1px at 58% 30%,#fff,transparent); opacity:.8; }
-@keyframes lgRise { from { transform:translateY(90px); } to { transform:none; } }
-@keyframes lgPulse { 0% { transform:scale(1); opacity:.9; } 100% { transform:scale(1.9); opacity:0; } }
 
 .lg2-head { position:relative; padding:calc(58px + var(--safe-t, 0px)) 26px 0; color:#fff; }
+.lg2-brand { display:flex; align-items:center; gap:11px; }
+.lg2-logo { width:46px; height:46px; border-radius:14px; flex:none; }
 .lg2-title { font-size:34px; font-weight:900; letter-spacing:-0.06em; margin:0; text-shadow:0 2px 14px rgba(10,30,90,.18); }
-.lg2-greet { margin:6px 0 0; font-size:15px; font-weight:600; opacity:.9; }
 .lg2-close { position:absolute; right:18px; top:calc(52px + var(--safe-t, 0px)); width:40px; height:40px; border-radius:50%;
   background:rgba(255,255,255,.18); color:#fff; display:flex; align-items:center; justify-content:center; }
 .lg2-close svg { width:18px; height:18px; }
@@ -1584,14 +1578,11 @@ body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(18
 
 .lg2-sp { flex:1; min-height:18px; }
 .lg2-submit { height:54px; border-radius:15px; font-size:16px; }
-.lg2.busy .lg2-sun { animation:lgSpin 1.2s linear infinite; }
-@keyframes lgSpin { 50% { transform:scale(1.06); } }
 .lg2-guest { margin-top:12px; padding:10px; text-align:center; font-size:13.5px; font-weight:600; color:#8B94A6; }
 .lg2-guest b { color:#326CF9; font-weight:800; }
 .lg2-offline { margin:6px 0 0; font-size:14.5px; line-height:1.6; color:#4A5568; text-align:center; }
 .lg2-modal .lg2-sheet { min-height:60%; }
 
 @media (prefers-reduced-motion: reduce) {
-  .lg2-sun, .lg2-sheet, .lg2-ray, .lg2.busy .lg2-sun { animation:none; }
-  .lg2-ray { display:none; }
+  .lg2-sheet { animation:none; }
 }
