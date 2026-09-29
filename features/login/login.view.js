@@ -241,11 +241,11 @@ var LoginView = (function () {
       });
   }
 
-  /* 로그인 방식과 상관없이 다음은 같다 — 동의(아직 답 안 했으면) → 온보딩.
-     계정이 있어도 기록 전송은 동의해야만 한다(로그인 ≠ 동의). */
+  /* 로그인 방식과 상관없이 다음은 같다 — 동의(필수, 아직 안 했으면) → 온보딩.
+     계정이 있어도 동의는 따로 받는다(로그인 ≠ 동의). */
   function next() {
     hide();
-    if (ConsentService.answered()) OnboardingView.show();
+    if (ConsentService.given()) OnboardingView.show();
     else ConsentView.show(function () { OnboardingView.show(); });
   }
 

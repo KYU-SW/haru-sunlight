@@ -37,7 +37,11 @@ var App = (function () {
       t.onclick = function () { go(t.dataset.tab); };
     });
     watchScroll();
+    enter();
+  }
 
+  /* 첫 진입 · 동의 확인을 거쳐 홈으로 */
+  function enter() {
     state.profile = Repo.getProfile();
     state.location = Repo.getLocation();
 
@@ -46,8 +50,20 @@ var App = (function () {
       LoginView.show();
       return;
     }
-    if (ConsentService.given()) Auth.ensure(); // 동의한 사람만 익명 로그인 (기다리지 않음)
-    Sync.start();                              // 밀린 기록 올리기 + 온라인 복귀 때 다시 시도 (동의 안 했으면 아무것도 안 함)
+    /* 동의는 필수 — 예전에 거부했거나 문구가 바뀌었으면 동의부터 받고 들어간다 */
+    if (!ConsentService.given()) {
+      ConsentView.show(function () {
+        var ob = document.getElementById('onboarding');
+        ob.classList.remove('show');
+        ob.innerHTML = '';
+        /* 동의하고 나면 주소에 남은 탭(#settings 등)이 아니라 홈으로 */
+        try { history.replaceState(null, '', '#home'); } catch (e) {}
+        enter();
+      });
+      return;
+    }
+    Auth.ensure();   // 익명 로그인 (기다리지 않음)
+    Sync.start();    // 밀린 기록 올리기 + 온라인 복귀 때 다시 시도
     var hash = (location.hash || '').replace('#', '');
     if (hash === 'timer') hash = 'home';      // 주소로 바로 들어오는 길도 막는다
     if (hash) state.tab = hash;
