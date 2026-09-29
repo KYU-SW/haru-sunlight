@@ -170,7 +170,8 @@ var HomeService = (function () {
     if (!rx.tomorrow) return '내일 아침에 다시 확인해 주세요';
     var t = rx.tomorrow;
     if (t.window) {
-      return '내일은 ' + UI.hmk(t.window.recommendStart) + '부터 ' +
+      /* 두 줄로 — '내일은 오후 12:00부터' / '24분 쬘 수 있어요' */
+      return '내일은 ' + UI.hmk(t.window.recommendStart) + '부터<br>' +
              t.window.recommendMinutes + '분 쬘 수 있어요';
     }
     return '내일도 햇빛 시간이 없어요 · ' + t.rx.mode.label + ' 예보';

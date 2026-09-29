@@ -2,9 +2,8 @@
    기능: 기록 수집 동의 (작업지시서 4-2 · 6절)
 
    흐름: 시작 화면 → [동의 화면] → 온보딩 → 홈
-     · 동의하면   : 익명 로그인 → (다음 단계) 기록 업로드 켜짐
-     · 동의 안 하면: 앱은 똑같이 쓰고, 로그인·업로드는 하지 않는다
-   마이페이지의 '기록 전송' 스위치로 언제든 끄고 켤 수 있다(동의 철회).
+     · 동의는 필수다 — 동의해야 앱을 쓸 수 있다. 동의하면 익명 로그인 → 기록 업로드.
+     · 예전에 거부했거나 문구 버전이 바뀌었으면 앱을 열 때 다시 받는다(App.enter).
 
    ⚠️ 문구는 6절 초안이다 — 법률 검토를 거친 문구가 아니다.
    ⚠️ KEEP_DAYS · CONTACT 는 팀이 정할 값이다(작업지시서 9절). 정해지면 여기만 채운다.
@@ -22,19 +21,10 @@ var ConsentService = (function () {
     var c = get();
     return !!(c && c.agreed && c.version === VERSION);
   }
-  /* 한 번이라도 답을 했는가 (동의든 거부든) */
-  function answered() {
-    var c = get();
-    return !!(c && c.version === VERSION);
-  }
-
   function agree() {
     Repo.setProfile({ consent: { agreed: true, version: VERSION, at: Date.now() } });
     /* 동의한 사람만 익명 로그인하고, 이어서 사용자 정보를 올린다 */
     return Auth.ensure().then(function () { if (window.Sync) return Sync.run(); });
-  }
-  function decline() {
-    Repo.setProfile({ consent: { agreed: false, version: VERSION, at: Date.now() } });
   }
 
   /* 화면에 보일 항목 — 6절 초안 그대로 */
@@ -45,13 +35,12 @@ var ConsentService = (function () {
       ['목적', '전공 발표의 앱 효과 평가 (여러 사람의 평균 통계로만 써요)'],
       ['보관', KEEP_DAYS ? '평가가 끝나고 ' + KEEP_DAYS + '일 안에 지워요' : '평가가 끝나면 지워요 (기간은 따로 안내해요)'],
       ['제3자 제공', '없어요'],
-      ['거부', '동의하지 않아도 앱은 똑같이 쓸 수 있고, 기록은 보내지 않아요. 마이페이지에서 언제든 전송을 끌 수 있어요.'],
+      ['필수', '동의해야 앱을 쓸 수 있어요'],
       ['문의', CONTACT || '따로 안내해요']
     ];
   }
 
-  return { VERSION: VERSION, get: get, given: given, answered: answered,
-           agree: agree, decline: decline, items: items };
+  return { VERSION: VERSION, get: get, given: given, agree: agree, items: items };
 })();
 
 
@@ -91,15 +80,13 @@ var ConsentView = (function () {
       '<div class="ob-in">' +
         '<div class="ob-body enter">' +
           '<div class="ob-step">시작하기 전에</div>' +
-          '<div class="ob-q">사용 기록을<br>평가에 보태 주실래요?</div>' +
-          '<div class="ob-help">앱이 실제로 도움이 되는지 보려고 사용 기록을 <b>익명으로</b> 모아요. ' +
-            '동의하지 않아도 앱은 똑같이 쓸 수 있어요.</div>' +
+          '<div class="ob-q">사용 기록 수집에<br>동의해 주세요</div>' +
+          '<div class="ob-help">앱이 실제로 도움이 되는지 보려고 사용 기록을 <b>익명으로</b> 모아요.</div>' +
           listHtml() +
           checksHtml('cs-') +
         '</div>' +
         '<div class="ob-foot">' +
           '<button class="btn btn-primary" id="cs-yes" disabled>동의하고 시작</button>' +
-          '<button class="ob-skip" id="cs-no">동의하지 않고 시작</button>' +
         '</div>' +
       '</div>';
 
@@ -110,28 +97,7 @@ var ConsentView = (function () {
       S.agree();               // 로그인은 기다리지 않는다 — 오프라인이어도 바로 넘어간다
       next();
     };
-    document.getElementById('cs-no').onclick = function () {
-      S.decline();
-      next();
-    };
   }
 
-  /* 마이페이지에서 전송을 다시 켤 때 — 같은 내용을 시트로 */
-  function sheet(onAgree) {
-    UI.sheet('기록 전송', '앱이 실제로 도움이 되는지 보려고 사용 기록을 익명으로 모아요.',
-      listHtml() + checksHtml('cs2-') +
-      '<button class="btn btn-primary" id="cs2-yes" style="margin-top:16px" disabled>동의하고 켜기</button>');
-    var body = document.getElementById('sheet-body');
-    body.classList.add('tall');
-    var yes = body.querySelector('#cs2-yes');
-    wire(body, 'cs2-', yes);
-    yes.onclick = function () {
-      if (yes.disabled) return;
-      S.agree();
-      UI.closeSheet();
-      if (onAgree) onAgree();
-    };
-  }
-
-  return { show: show, sheet: sheet };
+  return { show: show };
 })();
