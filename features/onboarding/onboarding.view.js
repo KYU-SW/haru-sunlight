@@ -209,8 +209,7 @@ var OnboardingView = (function () {
       if (S.state.step === S.total() - 1) {
         S.complete();
         if (window.Sync) Sync.run();   // 피부 타입·시도를 사용자 정보에 반영 (동의했을 때만)
-        hide();
-        App.boot();
+        showCalc();
       } else { S.next(); render(); }
     };
     var back = document.getElementById('ob-back');
@@ -268,6 +267,66 @@ var OnboardingView = (function () {
           });
       };
     }
+  }
+
+  /* ---------- 마지막 — '맞춤 처방을 계산하고 있어요' ----------
+     입력한 값이 실제로 쓰였다는 걸 보여 준다. 가짜 기다림이 아니라 실제로 오늘 날씨를 받는 동안
+     원이 차오르고, 계산이 빨리 끝나도 한 단계씩 천천히 눈에 들어오게 단계마다 STEP_MS만큼 보여 준다. */
+  var STEP_MS = 1000;
+  var CALC_R = 54, CALC_C = 2 * Math.PI * CALC_R;
+  var CHECK = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8.5l3 3 6-7" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+  function showCalc() {
+    var loc = Repo.getLocation();
+    var steps = ['피부 타입 반영', '나이 · 체형 반영', (loc ? loc.name + ' ' : '') + '오늘 날씨 불러오기', '오늘 햇빛 시간 계산'];
+    root.innerHTML =
+      '<div class="ob-in"><div class="cc">' +
+        '<div class="cc-ring">' +
+          '<svg viewBox="0 0 128 128"><circle class="trk" cx="64" cy="64" r="' + CALC_R + '"/>' +
+          '<circle class="arc" id="cc-arc" cx="64" cy="64" r="' + CALC_R + '" stroke-dasharray="' + CALC_C + '" stroke-dashoffset="' + CALC_C + '"/></svg>' +
+          '<div class="cc-num" id="cc-num">0%</div>' +
+        '</div>' +
+        '<div class="cc-t">맞춤 처방을<br>계산하고 있어요</div>' +
+        '<ul class="cc-list">' + steps.map(function (t) { return '<li><i>' + CHECK + '</i>' + UI.esc(t) + '</li>'; }).join('') + '</ul>' +
+      '</div></div>';
+
+    var arc = document.getElementById('cc-arc'), num = document.getElementById('cc-num');
+    var items = root.querySelectorAll('.cc-list li');
+    /* 원과 숫자는 한 프레임씩 같이 그린다. 단계가 진행되는 동안 그 단계 몫(25%)을
+       STEP_MS에 걸쳐 일정한 속도로 채워, 단계가 이어지면 끊김 없이 계속 차오른다. */
+    var shown = 0, from = 0, to = 0, t0 = 0, raf = 0;
+    function draw(p) {
+      arc.style.strokeDashoffset = CALC_C * (1 - p / 100);
+      num.textContent = Math.floor(p) + '%';
+    }
+    function frame(now) {
+      var k = Math.min(1, (now - t0) / STEP_MS);
+      shown = from + (to - from) * k;
+      draw(shown);
+      raf = k < 1 ? requestAnimationFrame(frame) : 0;
+    }
+    function fillTo(p) {
+      from = shown; to = p; t0 = performance.now();
+      if (!raf) raf = requestAnimationFrame(frame);
+    }
+    function wait(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+    function step(i) {
+      if (items[i - 1]) { items[i - 1].classList.remove('run'); items[i - 1].classList.add('ok'); }
+      if (items[i]) items[i].classList.add('run');
+      if (i >= items.length) {                 // 다 끝났으면 남은 끝자리까지 바로 100%로
+        if (raf) cancelAnimationFrame(raf);
+        raf = 0; shown = 100; draw(100);
+        return;
+      }
+      fillTo((i + 1) * 25);                    // 지금 단계가 끝날 때 닿을 곳
+    }
+
+    step(0);
+    wait(STEP_MS).then(function () { step(1); return wait(STEP_MS); })
+      .then(function () { step(2); return Promise.all([WeatherAPI.load(loc, false).catch(function () {}), wait(STEP_MS)]); })
+      .then(function () { step(3); return wait(STEP_MS); })
+      .then(function () { step(4); return wait(STEP_MS + 200); })
+      .then(function () { hide(); App.boot(); });   // 날씨는 방금 받아 둬서 홈은 바로 뜬다
   }
 
   return { show: show, hide: hide, numFields: numFields, ageWheel: ageWheel, bindWheel: bindWheel };
