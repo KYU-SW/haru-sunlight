@@ -33,6 +33,52 @@ var Engine = (function () {
     longLong:   { f: 0.06, label: '긴팔 + 긴바지' }
   };
 
+  /* ---------- 개인 변수 — 근거와 출처는 CALCULATION.md ⑤ ---------- */
+
+  /* 쬐는 장소 — 바닥이 자외선을 되쏘아 몸이 받는 양이 늘어난다 (WHO 2002 자외선지수 안내서)
+       풀·흙·도로·물 10% 미만 → 0으로 둠 · 마른 모래 15% · 바닷물 거품 25% · 새 눈 최대 80% */
+  var PLACES = {
+    normal: { r: 0,    label: '공원 · 길' },
+    sand:   { r: 0.15, label: '모래사장' },
+    sea:    { r: 0.25, label: '바닷가' },
+    snow:   { r: 0.8,  label: '눈 위' }
+  };
+
+  /* 기준 체표면적(㎡) — 임상에서 표준 성인으로 쓰는 1.73㎡.
+     K는 '몸의 몇 %'로 정한 값이라, 몸이 작으면 같은 비율이라도 피부 면적이 작아 더 오래 걸린다. */
+  var BSA_REF = 1.73;
+
+  /* 체표면적 — Mosteller(1987, NEJM): √(키cm × 몸무게kg ÷ 3600) */
+  function bodySurface(heightCm, weightKg) {
+    return heightCm > 0 && weightKg > 0 ? Math.sqrt(heightCm * weightKg / 3600) : BSA_REF;
+  }
+  function bmi(heightCm, weightKg) {
+    return heightCm > 0 && weightKg > 0 ? weightKg / Math.pow(heightCm / 100, 2) : null;
+  }
+
+  /* 나이 — 피부의 비타민D 원료(7-DHC)가 20세 → 80세에 약 50% 준다 (MacLaughlin & Holick 1985, J Clin Invest).
+     2024년 연구(Borecka 외, Nutrients)는 원료 차이는 없었지만 자외선 뒤 혈중 비타민D3 증가가
+     노년 67% · 청년 107%로 노년이 약 0.6배 — 두 연구 모두 70대에서 0.6 안팎을 가리킨다.
+     20세 이하 1 → 80세 0.5 까지 곧게 줄고, 그 뒤는 0.5로 둔다. */
+  function ageFactor(age) {
+    if (!(age > 20)) return 1;
+    return Math.max(0.5, 1 - 0.5 * (age - 20) / 60);
+  }
+
+  /* 비만(BMI 30 이상) — 같은 자외선을 쬐어도 혈중 비타민D 증가가 57% 낮다
+     (Wortsman 외 2000, Am J Clin Nutr) → 같은 양을 쓰려면 1 ÷ 0.43배 */
+  var OBESE_BMI = 30, OBESE_EFFICIENCY = 0.43;
+  function obesityFactor(b) { return b != null && b >= OBESE_BMI ? 1 / OBESE_EFFICIENCY : 1; }
+
+  /* 프로필에서 계산에 쓰는 값만 뽑는다 — 모든 호출부가 같은 값을 넘기게 */
+  function personal(profile) {
+    profile = profile || {};
+    return {
+      skinType: profile.skinType, clothing: profile.clothing, place: profile.place,
+      age: profile.age, heightCm: profile.heightCm, weightKg: profile.weightKg
+    };
+  }
+
   var LIMIT_LABEL = {
     vitd: '비타민D 필요량',
     burn: '화상 한계',
@@ -75,12 +121,20 @@ var Engine = (function () {
     var med  = MED[o.skinType] || MED[3];
     var fBSA = (CLOTHING[o.clothing] || CLOTHING.shortShort).f;
     var uvi  = o.uvi > 0 ? o.uvi : 0;
+    var refl = (PLACES[o.place] || PLACES.normal).r;
 
-    var denom = UVI_COEFF * uvi;
+    /* 바닥 반사만큼 몸이 받는 자외선이 늘어난다 — 비타민D·화상 둘 다에 적용 */
+    var denom = UVI_COEFF * uvi * (1 + refl);
+
+    /* 사람마다 다른 몫 — 값을 모르면 1(영향 없음) */
+    var bsa = bodySurface(o.heightCm, o.weightKg);
+    var b = bmi(o.heightCm, o.weightKg);
+    var personalF = (1 / ageFactor(o.age)) * (BSA_REF / bsa) * obesityFactor(b);
 
     /* 비타민D : 기준 옷차림(F_REF)에서 K×MED를 받는 데 걸리는 시간.
-       노출 면적이 좁으면 그 비율만큼 오래 걸린다(생성량 = 강도 × 시간 × 면적). */
-    var vitd = denom > 0 ? (K * med * F_REF) / (denom * fBSA) : Infinity;
+       노출 면적이 좁으면 그 비율만큼 오래 걸린다(생성량 = 강도 × 시간 × 면적).
+       나이·몸 크기·비만은 같은 자외선에서 만들어 쓰는 양을 바꾼다. */
+    var vitd = denom > 0 ? (K * med * F_REF) / (denom * fBSA) * personalF : Infinity;
 
     /* 화상 : 면적과 무관하다 — 드러난 피부 한 곳이 받는 양은 옷차림과 상관없이 같다. */
     var burn = denom > 0 ? med / denom : Infinity;
@@ -104,15 +158,18 @@ var Engine = (function () {
       uvi: uvi, uviClear: o.uviClear == null ? null : o.uviClear,
       tempC: o.tempC, rh: o.rh, feelsLike: o.feelsLike,
       heatFromForecast: (o.feelsLike != null && isFinite(o.feelsLike)),
-      med: med, fBSA: fBSA
+      med: med, fBSA: fBSA, place: o.place || 'normal', reflection: refl,
+      bsa: bsa, bmi: b, personalFactor: personalF,
+      rain: !!o.rain
     };
   }
 
-  /* ---------- §2 창이 열리는 조건 (셋 다 만족해야 함) ---------- */
+  /* ---------- §2 창이 열리는 조건 (넷 다 만족해야 함) ---------- */
   function isOpen(altitudeDeg, r) {
     return altitudeDeg >= 45          // 1. 그림자가 키보다 짧다 = UVB 도달
         && r.heat > 0                 // 2. 열 안전 상한 > 0
-        && r.minutes <= 60;           // 3. 60분 넘으면 비현실적이라 창을 안 냄
+        && r.minutes <= 60            // 3. 60분 넘으면 비현실적이라 창을 안 냄
+        && !r.rain;                   // 4. 비·눈 예보 시간은 뺀다 (기상청 강수형태 PTY)
   }
 
   /* ---------- 시간별 데이터 → 10분 간격 보간 ---------- */
@@ -129,7 +186,8 @@ var Engine = (function () {
           tempC: a.tempC + (b.tempC - a.tempC) * w,
           rh:    lerp(a.rh, b.rh, w),
           feelsLike: lerp(a.feelsLike, b.feelsLike, w),
-          uviClear:  lerp(a.uviClear,  b.uviClear,  w)
+          uviClear:  lerp(a.uviClear,  b.uviClear,  w),
+          rain: !!a.rain                  // 강수는 그 시각부터 한 시간 동안으로 본다
         });
       }
     }
@@ -146,12 +204,14 @@ var Engine = (function () {
   /* ---------- 노출창 탐색 ----------
      series: [{minuteOfDay, uvi, tempC, rh}] · sunAlt(minuteOfDay) → 고도(도) */
   function scan(series, profile, sunAlt) {
+    var me = personal(profile);
     return series.map(function (p) {
-      var r = computePoint({
+      var o = {
         uvi: p.uvi, uviClear: p.uviClear, tempC: p.tempC, rh: p.rh,
-        feelsLike: p.feelsLike,
-        skinType: profile.skinType, clothing: profile.clothing
-      });
+        feelsLike: p.feelsLike, rain: p.rain
+      };
+      for (var k in me) o[k] = me[k];
+      var r = computePoint(o);
       r.minuteOfDay = p.minuteOfDay;
       r.altitude = sunAlt(p.minuteOfDay);
       r.open = isOpen(r.altitude, r);
@@ -234,6 +294,19 @@ var Engine = (function () {
     };
   }
 
+  /* ---------- 평소 나가는 시각 — 내 기록에서 찾는다 ----------
+     최근 14일 타이머 기록이 3번 이상이면 시작 시각의 가운데 값(분). 모자라면 null. */
+  var HABIT_DAYS = 14, HABIT_MIN_COUNT = 3;
+  function habitMinute(sessions, nowMs) {
+    var from = (nowMs || Date.now()) - HABIT_DAYS * 86400000;
+    var mins = (sessions || []).filter(function (s) { return s && s.at >= from; })
+      .map(function (s) { var d = new Date(s.at); return d.getHours() * 60 + d.getMinutes(); })
+      .sort(function (a, b) { return a - b; });
+    if (mins.length < HABIT_MIN_COUNT) return null;
+    var h = mins.length >> 1;
+    return mins.length % 2 ? mins[h] : Math.round((mins[h - 1] + mins[h]) / 2);
+  }
+
   /* ---------- 체내 저장량 추적 — 25(OH)D 반감기 ≈ 21일 ---------- */
   var HALF_LIFE_DAYS = 21;
 
@@ -305,6 +378,9 @@ var Engine = (function () {
 
   return {
     K: K, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING, F_REF: F_REF,
+    PLACES: PLACES, BSA_REF: BSA_REF, OBESE_BMI: OBESE_BMI,
+    bodySurface: bodySurface, bmi: bmi, ageFactor: ageFactor, obesityFactor: obesityFactor,
+    personal: personal, habitMinute: habitMinute,
     HALF_LIFE_DAYS: HALF_LIFE_DAYS, LIMIT_LABEL: LIMIT_LABEL,
     heatIndex: heatIndex, heatCap: heatCap,
     computePoint: computePoint, isOpen: isOpen,

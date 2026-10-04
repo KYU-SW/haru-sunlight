@@ -73,10 +73,10 @@ var TimerService = (function () {
     var profile = Repo.getProfile();
     var nowM = Prescription.localNow(st.rx.tz).minute;   // 예보 지점 현지 시각
     var p = Prescription.pointAt(st.rx, nowM);
-    var r = Engine.computePoint({
-      uvi: p.uvi, tempC: p.tempC, rh: p.rh,
-      skinType: profile.skinType, clothing: profile.clothing
-    });
+    var o = { uvi: p.uvi, tempC: p.tempC, rh: p.rh };
+    var me = Engine.personal(profile);
+    for (var k in me) o[k] = me[k];
+    var r = Engine.computePoint(o);
     r.altitude = p.altitude;
     r.minuteOfDay = nowM;
     return r;
@@ -148,6 +148,7 @@ var TimerService = (function () {
       minutes: minutes,
       percent: percent,
       clothing: Repo.getProfile().clothing,
+      place: Repo.getProfile().place,
       spf: Repo.getProfile().spf,
       limitedBy: s.limitedBy
     });

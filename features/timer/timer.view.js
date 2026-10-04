@@ -122,7 +122,8 @@ var TimerView = (function () {
     return '오늘은 햇빛 시간이 없어요';
   }
 
-  /* ---------- 옷차림 (즉시 반영) ---------- */
+  /* ---------- 옷차림 · 장소 (즉시 반영) ----------
+     장소는 바닥이 햇빛을 되쏘는 정도 — 위치로는 알 수 없어 직접 고른다. 지난번 고른 걸 기억한다. */
   function gearSec() {
     var p = Repo.getProfile();
     return '<div class="sec">' +
@@ -134,6 +135,17 @@ var TimerView = (function () {
         Object.keys(Engine.CLOTHING).map(function (k) {
           return '<button data-c="' + k + '"' + (p.clothing === k ? ' class="on"' : '') + '>' +
                  Engine.CLOTHING[k].label + '</button>';
+        }).join('') +
+      '</div></div>' +
+      '<div class="sec">' +
+      '<div class="c-head">' +
+        '<div class="c-ico">📍</div>' +
+        '<div class="c-t">쬐는 곳</div>' +
+      '</div>' +
+      '<div class="seg" id="t-place">' +
+        Object.keys(Engine.PLACES).map(function (k) {
+          return '<button data-p="' + k + '"' + ((p.place || 'normal') === k ? ' class="on"' : '') + '>' +
+                 Engine.PLACES[k].label + '</button>';
         }).join('') +
       '</div></div>';
   }
@@ -166,6 +178,9 @@ var TimerView = (function () {
     [].forEach.call(el.querySelectorAll('#t-cloth button'), function (b) {
       b.onclick = function () { setGear({ clothing: b.dataset.c }); };
     });
+    [].forEach.call(el.querySelectorAll('#t-place button'), function (b) {
+      b.onclick = function () { setGear({ place: b.dataset.p }); };
+    });
   }
 
   function setGear(patch) {
@@ -174,6 +189,9 @@ var TimerView = (function () {
     var p = Repo.getProfile();
     [].forEach.call(el.querySelectorAll('#t-cloth button'), function (b) {
       b.classList.toggle('on', b.dataset.c === p.clothing);
+    });
+    [].forEach.call(el.querySelectorAll('#t-place button'), function (b) {
+      b.classList.toggle('on', b.dataset.p === (p.place || 'normal'));
     });
 
     if (TimerService.isRunning()) {

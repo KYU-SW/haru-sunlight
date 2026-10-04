@@ -246,6 +246,7 @@ var HomeService = (function () {
               : '화상 한계로 ' + UI.mins(w.best.burn) + '까지 · 팔·다리를 더 내놓으면 줄어요')
           : null,
         best: i === 0,
+        habit: !!w.habit,           // 평소 나가는 시각(내 기록)이 들어 있는 창
         active: rx.activeWindow === w
       };
     });
@@ -305,6 +306,7 @@ var HomeService = (function () {
       minutes: session.minutes,
       percent: session.percent,
       clothing: session.clothing,
+      place: session.place,
       spf: session.spf,
       limitedBy: session.limitedBy
     });

@@ -86,7 +86,9 @@ var KmaProvider = (function () {
     return { fcst: base + '/fcst', uv: base + '/uv', auth: '?', via: 'proxy' };
   }
 
-  /* ---------- 단기예보: 기온(TMP) · 습도(REH) ---------- */
+  /* ---------- 단기예보: 기온(TMP) · 습도(REH) · 강수형태(PTY) ----------
+     구름(SKY)은 따로 쓰지 않는다 — 기상청 자외선지수 예보에 구름 보정이 이미 들어 있어
+     한 번 더 곱하면 두 번 깎인다. 강수는 '그 시간에 나갈 수 있나'를 가르는 데만 쓴다. */
   function fetchForecast(src, nx, ny, now) {
     var bases = recentBases(now, FCST_BASE_HOURS, 2);
 
@@ -112,7 +114,7 @@ var KmaProvider = (function () {
   function parseForecast(items) {
     var days = {};   // {'2026-08-31': {9: {tempC, rh}, ...}}
     items.forEach(function (it) {
-      if (it.category !== 'TMP' && it.category !== 'REH') return;
+      if (it.category !== 'TMP' && it.category !== 'REH' && it.category !== 'PTY') return;
       var date = dashed(it.fcstDate);
       var hour = parseInt(String(it.fcstTime).slice(0, 2), 10);
       if (!days[date]) days[date] = {};
@@ -120,7 +122,8 @@ var KmaProvider = (function () {
       var v = parseFloat(it.fcstValue);
       if (isNaN(v)) return;
       if (it.category === 'TMP') days[date][hour].tempC = v;
-      else days[date][hour].rh = v;
+      else if (it.category === 'REH') days[date][hour].rh = v;
+      else days[date][hour].pty = v;     // 0 없음 · 1 비 · 2 비/눈 · 3 눈 · 4 소나기
     });
     return days;
   }
@@ -194,6 +197,7 @@ var KmaProvider = (function () {
           uviClear: null,               // 기상청은 청천 UV를 주지 않는다
           tempC: hours[h].tempC,
           rh: hours[h].rh,
+          rain: (hours[h].pty || 0) > 0,
           feelsLike: null               // §3 NOAA Heat Index로 계산(엔진이 자동 처리)
         };
       });

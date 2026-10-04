@@ -15,25 +15,49 @@ var OnboardingService = (function () {
   ];
   var UNSURE_INDEX = 2;   // '잘 모르겠어요' → 타입 Ⅲ 기본값
 
-  var state = { step: 0, skinIndex: null, wakeTime: '07:00', loc: null };
+  /* 질문 2 — 나이(돌려서 고르기) · 키 · 몸무게(직접 입력). 마이페이지에서도 같은 방식으로 고친다.
+     동의 화면에서 만 14세 이상만 받으므로 나이는 14부터. 처음에는 25세에 맞춰 둔다. */
+  var AGE = { min: 14, max: 100, initial: 25 };
+  var BODY = {
+    heightCm: { min: 100, max: 230, label: '키',     unit: 'cm', obj: '키를',     top: '키는' },
+    weightKg: { min: 25,  max: 250, label: '몸무게', unit: 'kg', obj: '몸무게를', top: '몸무게는' }
+  };
+  /* 비어 있거나 범위를 벗어난 칸의 안내 문구 — 모두 맞으면 null */
+  function bodyError(v) {
+    for (var k in BODY) {
+      var n = parseFloat(v[k]), b = BODY[k];
+      if (v[k] === '' || v[k] == null) return b.obj + ' 입력해 주세요';
+      if (isNaN(n) || n < b.min || n > b.max) return b.top + ' ' + b.min + '~' + b.max + b.unit + ' 사이로 입력해 주세요';
+    }
+    return null;
+  }
+
+  var state = { step: 0, skinIndex: null, wakeTime: '07:00', loc: null, age: AGE.initial, body: { heightCm: '', weightKg: '' } };
 
   function steps() {
-    return ['skin', 'location'];
+    return ['skin', 'body', 'location'];
   }
   function total() { return steps().length; }
 
   function reset() {
     var p = Repo.getProfile();
-    state = { step: 0, skinIndex: null, wakeTime: p.wakeTime || '07:00', loc: Repo.getLocation() };
+    state = {
+      step: 0, skinIndex: null, wakeTime: p.wakeTime || '07:00', loc: Repo.getLocation(),
+      age: p.age || AGE.initial,
+      body: { heightCm: p.heightCm || '', weightKg: p.weightKg || '' }
+    };
   }
 
   function pickSkin(i) { state.skinIndex = i; }
   function setWake(v)  { state.wakeTime = v; }
   function setLoc(l)   { state.loc = l; }
+  function setBody(k, v) { state.body[k] = v; }
+  function setAge(v)   { state.age = v; }
 
   function canNext() {
     var s = steps()[state.step];
     if (s === 'skin') return state.skinIndex !== null;
+    if (s === 'body') return !!state.age && !bodyError(state.body);
     if (s === 'location') return !!state.loc;
     return true;
   }
@@ -58,17 +82,21 @@ var OnboardingService = (function () {
     Repo.setProfile({
       onboarded: true,
       skinType: skin,
-      wakeTime: state.wakeTime
+      wakeTime: state.wakeTime,
+      age: state.age,
+      heightCm: Math.round(parseFloat(state.body.heightCm)),
+      weightKg: Math.round(parseFloat(state.body.weightKg))
     });
     if (state.loc) Repo.setLocation(state.loc);
     return Repo.getProfile();
   }
 
   return {
-    SKIN_OPTIONS: SKIN_OPTIONS, UNSURE_INDEX: UNSURE_INDEX,
+    SKIN_OPTIONS: SKIN_OPTIONS, UNSURE_INDEX: UNSURE_INDEX, BODY: BODY, bodyError: bodyError,
+    AGE: AGE, setAge: setAge,
     get state() { return state; },
     steps: steps, total: total, reset: reset,
-    pickSkin: pickSkin, setWake: setWake, setLoc: setLoc,
+    pickSkin: pickSkin, setWake: setWake, setLoc: setLoc, setBody: setBody,
     canNext: canNext, next: next, back: back,
     useGeolocation: useGeolocation, useCity: useCity, complete: complete
   };

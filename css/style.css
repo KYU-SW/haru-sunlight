@@ -1586,3 +1586,59 @@ body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(18
 @media (prefers-reduced-motion: reduce) {
   .lg2-sheet { animation:none; }
 }
+
+/* ---------- 나이 · 키 · 몸무게 입력 (온보딩 · 마이페이지 '내 정보' 시트) ---------- */
+.ob-nums { display:flex; flex-direction:column; gap:10px; margin-top:22px; }
+.ob-num { display:flex; align-items:center; gap:12px; height:56px; padding:0 18px; border-radius:16px;
+  background:#fff; box-shadow:inset 0 0 0 1px var(--hair); cursor:text; }
+.ob-num:focus-within { box-shadow:inset 0 0 0 1.6px #326CF9; }
+.ob-num span { flex:none; width:58px; font-size:15px; font-weight:700; color:var(--ink-2); }
+.ob-num input { flex:1; min-width:0; border:0; background:transparent; font:inherit; font-size:18px; font-weight:700;
+  color:var(--ink); text-align:right; outline:none; -moz-appearance:textfield; }
+.ob-num input::-webkit-outer-spin-button, .ob-num input::-webkit-inner-spin-button { -webkit-appearance:none; margin:0; }
+.ob-num em { flex:none; width:26px; font-style:normal; font-size:15px; font-weight:600; color:var(--ink-3); }
+.ob-num-err { min-height:20px; margin:10px 2px 0; font-size:13px; font-weight:600; color:#E5484D; }
+.st-sh .ob-nums { margin-top:0; }
+.st-save { width:100%; height:52px; margin-top:6px; border-radius:16px; background:#326CF9; color:#fff; font-size:16px; font-weight:700; }
+.st-save:disabled { opacity:.4; }
+
+/* 나이 휠 — 위아래로 돌려서 고른다 (가운데 줄이 고른 값) */
+.ob-lab { margin:22px 2px 10px; font-size:14px; font-weight:700; color:var(--ink-2); }
+.ob-lab + .ob-nums { margin-top:0; }
+.wheel { position:relative; height:200px; border-radius:16px; background:#fff; box-shadow:inset 0 0 0 1px var(--hair); overflow:hidden; }
+.wheel-band { position:absolute; left:8px; right:8px; top:80px; height:40px; border-radius:11px; background:#EEF3FF; pointer-events:none; }
+.wheel-list { position:relative; height:100%; overflow-y:scroll; scroll-snap-type:y mandatory; overscroll-behavior:contain;
+  scrollbar-width:none; -webkit-mask-image:linear-gradient(transparent, #000 32%, #000 68%, transparent);
+  mask-image:linear-gradient(transparent, #000 32%, #000 68%, transparent); }
+.wheel-list::-webkit-scrollbar { display:none; }
+.wheel-list { cursor:grab; user-select:none; -webkit-user-select:none; touch-action:pan-y; }
+.wheel-list:active { cursor:grabbing; }
+.wheel-pad { height:80px; }
+.wheel-i { height:40px; line-height:40px; text-align:center; scroll-snap-align:center; cursor:pointer;
+  font-size:17px; font-weight:600; color:var(--ink-3); font-variant-numeric:tabular-nums; transition:color .15s; }
+.wheel-i.on { color:var(--ink); font-weight:800; font-size:19px; }
+.sheet .wheel { height:160px; }
+.sheet .wheel-band { top:60px; }
+.sheet .wheel-pad { height:60px; }
+
+/* ---------- 온보딩 마지막 — 맞춤 처방 계산 중 ---------- */
+.cc { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:0 28px 48px; }
+.cc-ring { position:relative; width:148px; height:148px; }
+.cc-ring svg { width:100%; height:100%; transform:rotate(-90deg); }
+.cc-ring .trk { fill:none; stroke:#EAF0FF; stroke-width:10; }
+.cc-ring .arc { fill:none; stroke:#326CF9; stroke-width:10; stroke-linecap:round; }
+.cc-num { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:30px; font-weight:800; color:var(--ink); font-variant-numeric:tabular-nums; }
+.cc-t { margin-top:28px; font-size:22px; font-weight:800; line-height:1.4; text-align:center; color:var(--ink); }
+.cc-list { list-style:none; margin:30px 0 0; padding:0; display:flex; flex-direction:column; gap:14px; }
+.cc-list li { display:flex; align-items:center; gap:10px; font-size:15px; font-weight:600; color:var(--ink-3); transition:color .2s; }
+.cc-list li i { box-sizing:border-box; width:20px; height:20px; flex:none; border-radius:50%; border:2px solid #D5DCE8;
+  display:flex; align-items:center; justify-content:center; transition:background .2s, border-color .2s; }
+.cc-list li i svg { width:12px; height:12px; opacity:0; transition:opacity .2s; }
+.cc-list li.run { color:var(--ink-2); }
+.cc-list li.run i { border-color:#326CF9 #326CF9 #326CF9 transparent; animation:ccSpin .8s linear infinite; }
+.cc-list li.ok { color:var(--ink); }
+.cc-list li.ok i { background:#326CF9; border-color:#326CF9; }
+.cc-list li.ok i svg { opacity:1; }
+@keyframes ccSpin { to { transform:rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .cc-list li.run i { animation:none; } }
