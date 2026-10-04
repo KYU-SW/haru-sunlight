@@ -26,6 +26,7 @@ var SettingsView = (function () {
 
         group('내 정보',
           navRow('s-body-skin', '피부 타입', '타입 ' + skin) +
+          navRow('s-body-size', '나이 · 키 · 몸무게', sizeText(p)) +
           navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '')) +
 
         group('알림',
@@ -97,6 +98,48 @@ var SettingsView = (function () {
 
   /* ---------- 내 정보 시트 : 피부 타입 · 기본 옷차림 ----------
      #sheet-body는 #screen-settings 밖에 있어 이 시트 전용 바인딩을 따로 건다. */
+  function sizeText(p) {
+    return p.age && p.heightCm && p.weightKg
+      ? p.age + '세 · ' + p.heightCm + 'cm · ' + p.weightKg + 'kg' : '입력 안 됨';
+  }
+
+  /* ---------- 나이 · 키 · 몸무게 시트 — 온보딩과 같은 칸 · 같은 범위 ---------- */
+  function bodySizeSheet() {
+    var p = Repo.getProfile();
+    var val = { heightCm: p.heightCm || '', weightKg: p.weightKg || '' };
+    var age = p.age || OnboardingService.AGE.initial;
+    UI.sheet('나이 · 키 · 몸무게', null,
+      '<div class="st-sh"><div class="st-sh-t">나이</div>' + OnboardingView.ageWheel('s-age', age) + '</div>' +
+      '<div class="st-sh"><div class="st-sh-t">키 · 몸무게</div>' + OnboardingView.numFields(OnboardingService.BODY, val, 's-') + '</div>' +
+      '<p class="ob-num-err" id="s-body-err"></p>' +
+      '<button class="st-save" id="s-body-save">저장</button>');
+    var keys = Object.keys(OnboardingService.BODY);
+    var save = document.getElementById('s-body-save');
+    function read() {
+      var v = {};
+      keys.forEach(function (k) { v[k] = document.getElementById('s-' + k).value; });
+      return v;
+    }
+    keys.forEach(function (k) {
+      document.getElementById('s-' + k).oninput = function () { document.getElementById('s-body-err').textContent = ''; };
+    });
+    OnboardingView.bindWheel(document.getElementById('s-age'), function (v) { age = v; });
+    save.onclick = function () {
+      var v = read(), err = OnboardingService.bodyError(v);
+      if (err) { document.getElementById('s-body-err').textContent = err; return; }
+      SettingsService.set({
+        age: age,
+        heightCm: Math.round(parseFloat(v.heightCm)),
+        weightKg: Math.round(parseFloat(v.weightKg))
+      });
+      App.invalidate();
+      if (window.Sync) Sync.run();      // 연령대 · BMI 구간을 사용자 정보에 반영
+      UI.closeSheet();
+      render();
+      UI.toast('저장했어요');
+    };
+  }
+
   function bodyInfoSheet() {
     var m = SettingsService.model(App.prescription());
     var p = m.profile;
@@ -221,6 +264,7 @@ var SettingsView = (function () {
     q('s-analysis').onclick = function () { WeeklyView.open('analysis'); };
     q('s-body-skin').onclick = q('s-body-cloth').onclick =
       function () { bodyInfoSheet(); };
+    q('s-body-size').onclick = function () { bodySizeSheet(); };
     q('s-region').onclick = function () { regionSheet(); };
 
     /* 게스트 → 계정: 회원가입하면 쓰던 익명 uid를 그대로 이어 받는다(Auth.signUpEmail) */

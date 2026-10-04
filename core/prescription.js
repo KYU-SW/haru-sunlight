@@ -83,11 +83,18 @@ var Prescription = (function () {
     rx.nowMinute = nowM;
     rx.nowPoint = pointAt(rx, nowM);
 
+    /* 평소 나가는 시각(내 기록) — 그 시각이 들어 있는 창을 '평소 시간'으로 표시하고,
+       아직 안 온 창 중에 있으면 다음 추천으로 먼저 고른다 */
+    rx.habitMinute = Engine.habitMinute(Repo.getSessions(), Date.now());
+    rx.windows.forEach(function (w) {
+      w.habit = rx.habitMinute != null && rx.habitMinute >= w.start && rx.habitMinute < w.end;
+    });
+
     rx.activeWindow = null;
     rx.nextWindow = null;
     rx.windows.forEach(function (w) {
       if (nowM >= w.start && nowM < w.end) rx.activeWindow = w;
-      else if (nowM < w.start && !rx.nextWindow) rx.nextWindow = w;
+      else if (nowM < w.start && (!rx.nextWindow || (w.habit && !rx.nextWindow.habit))) rx.nextWindow = w;
     });
     /* 오늘 낮(고도 45° 이상) 표본이 아예 없는지.
        저녁에 조회하면 기상청 발표 특성상 예보가 밤 시간만 남아,
@@ -132,13 +139,13 @@ var Prescription = (function () {
     return best;
   }
 
-  /* 지금 이 순간의 값을 프로필(옷차림·SPF)만 바꿔 재계산 — 타이머 실시간 반영용 */
+  /* 지금 이 순간의 값을 프로필(옷차림·장소 등)만 바꿔 재계산 — 타이머 실시간 반영용 */
   function recomputeNow(rx, profile) {
     var p = pointAt(rx, localNow(rx.tz).minute);
-    return Engine.computePoint({
-      uvi: p.uvi, tempC: p.tempC, rh: p.rh,
-      skinType: profile.skinType, clothing: profile.clothing
-    });
+    var o = { uvi: p.uvi, tempC: p.tempC, rh: p.rh, rain: p.rain };
+    var me = Engine.personal(profile);
+    for (var k in me) o[k] = me[k];
+    return Engine.computePoint(o);
   }
 
   /* 7일 예보 전체 처방 (주간 화면 · 장마 연속일수 판정) */

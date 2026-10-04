@@ -13,7 +13,7 @@
    ========================================================= */
 var Sync = (function () {
 
-  var APP_VERSION = 'v_0.4';
+  var APP_VERSION = 'v_0.5';
   var KEY_UP = 'sunrx.uploaded';        // 올린 문서 ID 목록
   var KEY_USER = 'sunrx.userSynced';    // users 문서를 처음 만든 uid (createdAt을 한 번만 넣으려고)
   var CLOTHES = ['shortShort', 'shortLong', 'longLong'];
@@ -44,6 +44,19 @@ var Sync = (function () {
     return c ? c.sido : null;
   }
 
+  /* 나이 · 키 · 몸무게는 원값을 보내지 않고 구간만 보낸다 (원값은 기기에만)
+       연령대: 10 · 20 · … · 70(70대 이상)
+       BMI 구간: 대한비만학회 기준 — 저체중 <18.5 · 정상 <23 · 비만 전단계 <25 · 1단계 비만 <30 · 2단계 이상 */
+  function ageGroup(age) {
+    if (!(age > 0)) return null;
+    return Math.min(70, Math.floor(age / 10) * 10);
+  }
+  function bmiGroup(p) {
+    var b = Engine.bmi(p.heightCm, p.weightKg);
+    if (b == null) return null;
+    return b < 18.5 ? 'under' : b < 23 ? 'normal' : b < 25 ? 'pre' : b < 30 ? 'obese1' : 'obese2';
+  }
+
   /* ---------- users/{uid} ---------- */
   function userDoc(uid) {
     var p = Repo.getProfile(), c = p.consent || {};
@@ -56,6 +69,9 @@ var Sync = (function () {
       appVersion: APP_VERSION
     };
     if (p.skinType) d.skinType = p.skinType;
+    var ag = ageGroup(p.age), bg = bmiGroup(p);
+    if (ag) d.ageGroup = ag;
+    if (bg) d.bmiGroup = bg;
     var sido = sidoOf(Repo.getLocation());
     if (sido) d.sido = sido;                       // 시·도 이름만 — 좌표·시군구는 보내지 않는다
     var synced = readJSON(KEY_USER, null);

@@ -9,6 +9,11 @@ var Repo = (function () {
     onboarded: false,
     skinType: 3,          // §7 기본값 — 타입 III
     clothing: 'shortShort',
+    place: 'normal',      // 쬐는 장소 — 타이머에서 고른다 (Engine.PLACES)
+    age: null,            // 나이(돌려서 고름) · 키(cm) · 몸무게(kg)(직접 입력) — 온보딩·마이페이지.
+                          // 원값은 기기에만 두고, 서버에는 연령대·BMI 구간만 보낸다
+    heightCm: null,
+    weightKg: null,
     spf: 1,               // 안 바르면 1
     wakeTime: '07:00',    // §6 생체리듬 축
     useCircadian: true,

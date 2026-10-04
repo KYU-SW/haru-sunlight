@@ -22,7 +22,12 @@ service cloud.firestore {
       allow create, update: if signedIn()
         && request.auth.uid == uid
         && request.resource.data.keys().hasOnly(
-             ['createdAt','updatedAt','consentedAt','consentVersion','skinType','sido','notify','appVersion']);
+             ['createdAt','updatedAt','consentedAt','consentVersion','skinType','sido','notify','appVersion',
+              'ageGroup','bmiGroup'])
+        // 나이 · 키 · 몸무게 원값은 받지 않는다 — 연령대와 BMI 구간만
+        && (!('ageGroup' in request.resource.data) || request.resource.data.ageGroup in [10, 20, 30, 40, 50, 60, 70])
+        && (!('bmiGroup' in request.resource.data)
+            || request.resource.data.bmiGroup in ['under', 'normal', 'pre', 'obese1', 'obese2']);
       allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
       allow delete: if false;
     }

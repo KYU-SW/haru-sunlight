@@ -149,7 +149,7 @@ var HomeView = (function () {
     return '<section class="ha-t ha-slots">' +
       '<div class="ha-lab" style="margin-bottom:10px">오늘 쬘 수 있는 시간</div>' +
       m.windows.map(function (w) {
-        var badge = w.active ? '<i class="now">지금</i>' : (w.best ? '<i>추천</i>' : '');
+        var badge = w.active ? '<i class="now">지금</i>' : (w.habit ? '<i>평소 시간</i>' : (w.best ? '<i>추천</i>' : ''));
         return '<button class="ha-slot" data-win="' + w.index + '">' +
           '<span class="ha-slot-ic">' + tf(w.active ? '🏃' : '☀️') + '</span>' +
           '<span class="ha-slot-b"><b>' + w.timeText + badge + '</b><small>' + (w.cappedNote || w.recommendText) + '</small></span>' +
