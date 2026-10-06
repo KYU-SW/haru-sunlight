@@ -7,11 +7,12 @@ var Engine = (function () {
 
   /* ---------- §2 상수 — 근거와 출처는 CALCULATION.md ---------- */
 
-  /* K : 하루 목표(1,000 IU)를 MED의 몇 배로 보는가.
-       곽민경·김재환(2011, 대기 21-1) — 체표면 6~10%에 0.5 MED → 비타민D 200 IU
-       → 1,000 IU = 0.5 MED × 체표면 40% → 기준 면적 32%로 환산하면 0.25
-       교차 검증: Kallioğlu 외(2024, Scientific Reports) 국제 모델은 0.20 (25% 이내 일치) */
-  var K = 0.25;
+  /* 비타민D 시간 — Sánchez-Pérez 외(2024, Heliyon 10:e30864) 식 4·6·9 그대로 (McKenzie 계열)
+       t = MED ÷ (k × R × 자외선지수 × 노출 비율)
+       k = 12.5 J/m²·min : 피부 타입 Ⅱ가 온몸을 드러내고 자외선지수 10, R = 2일 때 1,000 IU에 약 1분 (논문 유도값)
+       R = 1.3121 × 자외선지수^-0.1722 : 비타민D 유효 자외선 ÷ 홍반 유효 자외선 (식 6) */
+  var K_VITD = 12.5;
+  function vitdRatio(uvi) { return 1.3121 * Math.pow(uvi, -0.1722); }
 
   /* UVI → 분 단위 환산계수. 자외선지수 1 = 25 mW/m² (WHO·WMO·UNEP·ICNIRP)
      0.025 W/m² × 60초 = 1.5 */
@@ -20,55 +21,33 @@ var Engine = (function () {
   /* 피부 타입별 최소홍반량(J/m²) — Kallioğlu 외(2024, Scientific Reports) 표 */
   var MED = { 1: 200, 2: 250, 3: 300, 4: 450, 5: 600, 6: 1000 };
 
-  /* 기준 옷차림(반팔+반바지)의 노출 면적.
-     K가 이 면적을 전제로 한 값이라, 다른 옷차림은 면적 비율만큼 시간이 늘어난다.
-     이 기준이 없으면 긴 옷차림은 아무리 오래 있어도 목표를 못 채운다. */
-  var F_REF = 0.32;
-
-  /* 노출 면적 — 9의 법칙(Rule of Nines) 기준
-       얼굴·목 4.5% · 팔 아래쪽 9% · 다리 아래쪽 18% · 손 1.5% */
+  /* 노출 비율(AF) — Sánchez-Pérez 외(2024) 표 3 그대로
+       얼굴 0.09 · 얼굴+손 0.10 · 얼굴+손+팔 0.27 · 얼굴+손+팔+다리 0.63 · 온몸 1.00 */
   var CLOTHING = {
-    shortShort: { f: 0.32, label: '반팔 + 반바지' },
-    shortLong:  { f: 0.14, label: '반팔 + 긴바지' },
-    longLong:   { f: 0.06, label: '긴팔 + 긴바지' }
+    shortShort: { f: 0.63, label: '반팔 + 반바지' },   // 얼굴 · 손 · 팔 · 다리
+    shortLong:  { f: 0.27, label: '반팔 + 긴바지' },   // 얼굴 · 손 · 팔
+    longLong:   { f: 0.10, label: '긴팔 + 긴바지' }    // 얼굴 · 손
   };
 
   /* ---------- 개인 변수 — 근거와 출처는 CALCULATION.md ⑤ ---------- */
 
-  /* 쬐는 장소 — 바닥이 자외선을 되쏘아 몸이 받는 양이 늘어난다 (WHO 2002 자외선지수 안내서)
-       풀·흙·도로·물 10% 미만 → 0으로 둠 · 마른 모래 15% · 바닷물 거품 25% · 새 눈 최대 80% */
+  /* 쬐는 장소 — 바닥이 자외선을 되쏘아 몸이 받는 양이 늘어난다
+       모래 15% · 새 눈 최대 80% : WHO(2002) 자외선지수 안내서
+       바닷가 5% : Diffey & Mobley(2018) — 자외선지수 14에서 바닷물 반사는 지수 0.7 정도 */
   var PLACES = {
     normal: { r: 0,    label: '공원 · 길' },
     sand:   { r: 0.15, label: '모래사장' },
-    sea:    { r: 0.25, label: '바닷가' },
+    sea:    { r: 0.05, label: '바닷가' },
     snow:   { r: 0.8,  label: '눈 위' }
   };
 
-  /* 기준 체표면적(㎡) — 임상에서 표준 성인으로 쓰는 1.73㎡.
-     K는 '몸의 몇 %'로 정한 값이라, 몸이 작으면 같은 비율이라도 피부 면적이 작아 더 오래 걸린다. */
-  var BSA_REF = 1.73;
-
-  /* 체표면적 — Mosteller(1987, NEJM): √(키cm × 몸무게kg ÷ 3600) */
-  function bodySurface(heightCm, weightKg) {
-    return heightCm > 0 && weightKg > 0 ? Math.sqrt(heightCm * weightKg / 3600) : BSA_REF;
-  }
+  /* 나이 · 키 · 몸무게는 계산에 쓰지 않는다 (CALCULATION.md ⑤)
+       나이 — Borecka 외(2024, Nutrients): 65~89세와 18~40세의 비타민D 생성에 유의한 차이 없음
+       비만 — Obbarius 외(2017, Endocrine): 같은 UVB에서 비만군 증가가 오히려 51% 더 큼
+     BMI는 Firestore 통계 구간(shared/sync.js)에만 쓴다. */
   function bmi(heightCm, weightKg) {
     return heightCm > 0 && weightKg > 0 ? weightKg / Math.pow(heightCm / 100, 2) : null;
   }
-
-  /* 나이 — 피부의 비타민D 원료(7-DHC)가 20세 → 80세에 약 50% 준다 (MacLaughlin & Holick 1985, J Clin Invest).
-     2024년 연구(Borecka 외, Nutrients)는 원료 차이는 없었지만 자외선 뒤 혈중 비타민D3 증가가
-     노년 67% · 청년 107%로 노년이 약 0.6배 — 두 연구 모두 70대에서 0.6 안팎을 가리킨다.
-     20세 이하 1 → 80세 0.5 까지 곧게 줄고, 그 뒤는 0.5로 둔다. */
-  function ageFactor(age) {
-    if (!(age > 20)) return 1;
-    return Math.max(0.5, 1 - 0.5 * (age - 20) / 60);
-  }
-
-  /* 비만(BMI 30 이상) — 같은 자외선을 쬐어도 혈중 비타민D 증가가 57% 낮다
-     (Wortsman 외 2000, Am J Clin Nutr) → 같은 양을 쓰려면 1 ÷ 0.43배 */
-  var OBESE_BMI = 30, OBESE_EFFICIENCY = 0.43;
-  function obesityFactor(b) { return b != null && b >= OBESE_BMI ? 1 / OBESE_EFFICIENCY : 1; }
 
   /* 프로필에서 계산에 쓰는 값만 뽑는다 — 모든 호출부가 같은 값을 넘기게 */
   function personal(profile) {
@@ -107,13 +86,21 @@ var Engine = (function () {
     return (HI - 32) * 5 / 9;
   }
 
-  /* §3 표 — 체감온도 → 최대 노출 + 부가 지시문구
-     구간은 기상청 폭염특보 기준(체감 33℃ 주의보 · 35℃ 경보)에 맞춘다. */
-  function heatCap(hiC) {
+  /* §3 체감온도 — 고용노동부 「2026년 폭염 대비 노동자 건강보호 대책」(2026.5.13) 권고 그대로
+       33℃ 이상(폭염주의보)   : 옥외 활동 단축
+       35℃ 이상(폭염경보)     : 오후 2~5시 옥외 활동 중지
+       38℃ 이상(폭염중대경보) : 옥외 활동 중지
+     정부 기준에 '몇 분까지'라는 숫자는 없어서 분 상한은 두지 않고, 막는 시간대만 정한다. */
+  var HOT_START = 14 * 60, HOT_END = 17 * 60;
+  function heatCap(hiC, minuteOfDay) {
     if (hiC < 33) return { minutes: Infinity, level: 0, note: null };
-    if (hiC < 35) return { minutes: 20, level: 1, note: '물 마시고 나가세요' };
-    if (hiC < 38) return { minutes: 10, level: 2, note: '모자 쓰고, 직사광선 짧게' };
-    return { minutes: 0, level: 3, note: '노출 금지 — 다른 시간대로' };
+    if (hiC < 35) return { minutes: Infinity, level: 1, note: '폭염주의보 수준 — 짧게 나가세요' };
+    if (hiC < 38) {
+      var hot = minuteOfDay != null && minuteOfDay >= HOT_START && minuteOfDay < HOT_END;
+      return hot ? { minutes: 0, level: 2, note: '폭염경보 수준 — 오후 2~5시는 나가지 마세요' }
+                 : { minutes: Infinity, level: 2, note: '폭염경보 수준 — 오후 2~5시는 피하세요' };
+    }
+    return { minutes: 0, level: 3, note: '폭염중대경보 수준 — 나가지 마세요' };
   }
 
   /* ---------- §2 한 시점의 노출시간 ---------- */
@@ -126,15 +113,9 @@ var Engine = (function () {
     /* 바닥 반사만큼 몸이 받는 자외선이 늘어난다 — 비타민D·화상 둘 다에 적용 */
     var denom = UVI_COEFF * uvi * (1 + refl);
 
-    /* 사람마다 다른 몫 — 값을 모르면 1(영향 없음) */
-    var bsa = bodySurface(o.heightCm, o.weightKg);
-    var b = bmi(o.heightCm, o.weightKg);
-    var personalF = (1 / ageFactor(o.age)) * (BSA_REF / bsa) * obesityFactor(b);
-
-    /* 비타민D : 기준 옷차림(F_REF)에서 K×MED를 받는 데 걸리는 시간.
-       노출 면적이 좁으면 그 비율만큼 오래 걸린다(생성량 = 강도 × 시간 × 면적).
-       나이·몸 크기·비만은 같은 자외선에서 만들어 쓰는 양을 바꾼다. */
-    var vitd = denom > 0 ? (K * med * F_REF) / (denom * fBSA) * personalF : Infinity;
+    /* 비타민D : Sánchez-Pérez 외(2024) 식 4·9 — MED ÷ (k × R × 자외선지수 × 노출 비율)
+       바닥 반사만큼 받는 자외선이 늘고, R은 하늘의 자외선지수로 정한다. */
+    var vitd = uvi > 0 ? med / (K_VITD * vitdRatio(uvi) * uvi * (1 + refl) * fBSA) : Infinity;
 
     /* 화상 : 면적과 무관하다 — 드러난 피부 한 곳이 받는 양은 옷차림과 상관없이 같다. */
     var burn = denom > 0 ? med / denom : Infinity;
@@ -144,7 +125,7 @@ var Engine = (function () {
     var hi   = (o.feelsLike != null && isFinite(o.feelsLike))
              ? o.feelsLike
              : heatIndex(o.tempC, o.rh);
-    var heat = heatCap(hi);
+    var heat = heatCap(hi, o.minuteOfDay);
 
     var minutes = Math.min(vitd, burn, heat.minutes);
     var limitedBy = minutes === heat.minutes ? 'heat' : (minutes === burn ? 'burn' : 'vitd');
@@ -159,7 +140,7 @@ var Engine = (function () {
       tempC: o.tempC, rh: o.rh, feelsLike: o.feelsLike,
       heatFromForecast: (o.feelsLike != null && isFinite(o.feelsLike)),
       med: med, fBSA: fBSA, place: o.place || 'normal', reflection: refl,
-      bsa: bsa, bmi: b, personalFactor: personalF,
+
       rain: !!o.rain
     };
   }
@@ -208,7 +189,7 @@ var Engine = (function () {
     return series.map(function (p) {
       var o = {
         uvi: p.uvi, uviClear: p.uviClear, tempC: p.tempC, rh: p.rh,
-        feelsLike: p.feelsLike, rain: p.rain
+        feelsLike: p.feelsLike, rain: p.rain, minuteOfDay: p.minuteOfDay
       };
       for (var k in me) o[k] = me[k];
       var r = computePoint(o);
@@ -377,9 +358,8 @@ var Engine = (function () {
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   return {
-    K: K, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING, F_REF: F_REF,
-    PLACES: PLACES, BSA_REF: BSA_REF, OBESE_BMI: OBESE_BMI,
-    bodySurface: bodySurface, bmi: bmi, ageFactor: ageFactor, obesityFactor: obesityFactor,
+    K_VITD: K_VITD, vitdRatio: vitdRatio, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING,
+    PLACES: PLACES, bmi: bmi,
     personal: personal, habitMinute: habitMinute,
     HALF_LIFE_DAYS: HALF_LIFE_DAYS, LIMIT_LABEL: LIMIT_LABEL,
     heatIndex: heatIndex, heatCap: heatCap,

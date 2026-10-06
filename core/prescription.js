@@ -142,7 +142,7 @@ var Prescription = (function () {
   /* 지금 이 순간의 값을 프로필(옷차림·장소 등)만 바꿔 재계산 — 타이머 실시간 반영용 */
   function recomputeNow(rx, profile) {
     var p = pointAt(rx, localNow(rx.tz).minute);
-    var o = { uvi: p.uvi, tempC: p.tempC, rh: p.rh, rain: p.rain };
+    var o = { uvi: p.uvi, tempC: p.tempC, rh: p.rh, rain: p.rain, minuteOfDay: p.minuteOfDay };
     var me = Engine.personal(profile);
     for (var k in me) o[k] = me[k];
     return Engine.computePoint(o);
