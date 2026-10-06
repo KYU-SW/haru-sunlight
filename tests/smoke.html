@@ -29,53 +29,39 @@ function ok(name, cond, extra) {
 }
 function near(a, b, tol) { return Math.abs(a - b) <= tol; }
 
-/* ---------- 1. 엔진 단위 검증 (§2 공식 손계산 대조) ---------- */
-log('── 1. 엔진 · §2 공식');
-var r = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
-ok('비타민D = (0.25×300×0.32)/(1.5×8×0.32) = 6.25분', near(r.vitd, 6.25, 0.001), '실제 ' + r.vitd.toFixed(3));
-ok('화상   = 300/(1.5×8) = 25분',                      near(r.burn, 25, 0.001), '실제 ' + r.burn.toFixed(3));
-ok('최종 = min(6.25, 25) → 비타민D 기준',              near(r.minutes, 6.25, 0.001) && r.limitedBy === 'vitd');
+/* ---------- 1. 엔진 단위 검증 (Sánchez-Pérez 외 2024 식 손계산 대조) ---------- */
+log('── 1. 엔진 · 비타민D · 화상 공식');
+/* 논문 식 4·6·9 : t = MED ÷ (12.5 × R × UVI × (1+반사) × 노출 비율),  R = 1.3121 × UVI^-0.1722 */
+function vt(med, uvi, f, refl) { return med / (12.5 * 1.3121 * Math.pow(uvi, -0.1722) * uvi * (1 + (refl || 0)) * f); }
+ok('R(UVI 7) = 1.3121 × 7^-0.1722 ≈ 0.9385 (식 6)', near(Engine.vitdRatio(7), 0.9385, 0.0005), Engine.vitdRatio(7).toFixed(4));
+var r = Engine.computePoint({ uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
+ok('타입Ⅲ · UVI 7 · 반팔반바지(0.63) ≈ 5.8분', near(r.vitd, vt(300, 7, 0.63), 0.001) && near(r.vitd, 5.80, 0.01), '실제 ' + r.vitd.toFixed(3));
+ok('화상 = 300 ÷ (1.5×7) ≈ 28.6분 (식 2)', near(r.burn, 300 / 10.5, 0.001), '실제 ' + r.burn.toFixed(3));
+ok('최종 = min(비타민D, 화상) → 비타민D 기준', near(r.minutes, r.vitd, 0.001) && r.limitedBy === 'vitd');
 
-var r2 = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 6, clothing: 'longLong' });
-ok('피부VI+긴팔긴바지 = (0.25×1000×0.32)/(12×0.06) = 111.1분', near(r2.vitd, 111.111, 0.01), '실제 ' + r2.vitd.toFixed(3));
-ok('피부VI 화상한계 = 1000/12 = 83.3분',                        near(r2.burn, 83.333, 0.01));
-ok('이 경우 화상 한계가 먼저 와서 목표를 못 채움',               r2.limitedBy === 'burn');
+var r2 = Engine.computePoint({ uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong' });
+ok('긴팔긴바지(얼굴·손 0.10) = 약 36.5분', near(r2.vitd, vt(300, 7, 0.10), 0.001), '실제 ' + r2.vitd.toFixed(2));
+ok('이 경우 화상 한계(28.6분)가 먼저 와서 목표를 못 채움', r2.limitedBy === 'burn');
 
 var r3 = Engine.computePoint({ uvi: 0, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
 ok('UVI 0 → 무한대(창 안 열림)', !isFinite(r3.minutes));
 
-/* 노출면적은 분모 → 옷을 더 껴입을수록 필요시간이 길어진다.
-   기준 옷차림(F_REF = 반팔+반바지)에서 K가 정의되므로, 그때 필요시간 = 화상 한계 × K. */
-var few = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong' }).vitd;
-var many = Engine.computePoint({ uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' }).vitd;
-ok('긴팔긴바지가 반팔반바지보다 필요시간이 길다 (노출면적이 적을수록 오래)',
-   few > many, '긴팔 ' + few.toFixed(1) + '분 vs 반팔 ' + many.toFixed(1) + '분');
-ok('[구조] 기준 옷차림에서 비타민D 필요시간 = 화상 한계 × K(0.25)',
-   Math.abs(many / r.burn - Engine.K) < 0.001, '비율 ' + (many / r.burn).toFixed(3));
-ok('[구조] 필요시간은 노출면적에 반비례 (긴팔긴바지 = 반팔반바지 × 0.32/0.06)',
-   Math.abs(few / many - (0.32 / 0.06)) < 0.01, '배수 ' + (few / many).toFixed(2));
+var mid = Engine.computePoint({ uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'shortLong' }).vitd;
+ok('[구조] 필요시간은 노출 비율에 반비례 (반팔긴바지 = 반팔반바지 × 0.63/0.27)',
+   Math.abs(mid / r.vitd - 0.63 / 0.27) < 0.001, '배수 ' + (mid / r.vitd).toFixed(3));
+ok('[구조] 노출 비율은 논문 표 3 값', Engine.CLOTHING.shortShort.f === 0.63 && Engine.CLOTHING.shortLong.f === 0.27 && Engine.CLOTHING.longLong.f === 0.10);
 
-/* ---------- 1-2. 개인 변수 (CALCULATION.md ⑤) ---------- */
-log('── 1-2. 개인 변수 · 장소 · 비');
-var base = { uvi: 8, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' };
+/* ---------- 1-2. 장소 · 비 · 개인 정보 ---------- */
+log('── 1-2. 장소 · 비 · 개인 정보');
+var base = { uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' };
 function cp(extra) { var o = {}, k; for (k in base) o[k] = base[k]; for (k in extra) o[k] = extra[k]; return Engine.computePoint(o); }
-
-ok('나이·키·몸무게를 모르면 예전과 같다 (보정 1)', near(cp({}).vitd, 6.25, 0.001) && cp({}).personalFactor === 1);
-ok('20세 이하 나이 계수 1', Engine.ageFactor(18) === 1 && Engine.ageFactor(20) === 1);
-ok('50세 나이 계수 0.75 → 비타민D 시간 ÷0.75', near(cp({ age: 50 }).vitd, 6.25 / 0.75, 0.001), cp({ age: 50 }).vitd.toFixed(2) + '분');
-ok('80세 이상 나이 계수 0.5에서 멈춤', Engine.ageFactor(80) === 0.5 && Engine.ageFactor(95) === 0.5);
-ok('나이는 화상 시간을 바꾸지 않는다', near(cp({ age: 80 }).burn, 25, 0.001));
-var bsa = Engine.bodySurface(160, 50);
-ok('체표면적 = √(160×50÷3600) ≈ 1.49㎡ (Mosteller)', near(bsa, 1.4907, 0.001), bsa.toFixed(3));
-ok('작은 몸 → 비타민D 시간 × 1.73/1.49', near(cp({ heightCm: 160, weightKg: 50 }).vitd, 6.25 * 1.73 / bsa, 0.001),
-   cp({ heightCm: 160, weightKg: 50 }).vitd.toFixed(2) + '분');
-var ob = cp({ heightCm: 170, weightKg: 90 });   // BMI 31.1
-ok('BMI 30 이상 → ÷0.43 (Wortsman 2000)', ob.bmi >= 30 &&
-   near(ob.vitd, 6.25 * (1.73 / Engine.bodySurface(170, 90)) / 0.43, 0.001), 'BMI ' + ob.bmi.toFixed(1) + ' · ' + ob.vitd.toFixed(2) + '분');
-ok('BMI 29.9는 비만 보정 없음', Engine.obesityFactor(29.9) === 1);
+var B = cp({}).vitd;
+ok('나이 · 키 · 몸무게는 계산에 쓰지 않는다 (Borecka 2024 · Obbarius 2017)',
+   near(cp({ age: 85 }).vitd, B, 1e-9) && near(cp({ heightCm: 170, weightKg: 95 }).vitd, B, 1e-9));
 var snow = cp({ place: 'snow' });
-ok('눈 위(반사 0.8) → 비타민D·화상 둘 다 ÷1.8', near(snow.vitd, 6.25 / 1.8, 0.001) && near(snow.burn, 25 / 1.8, 0.001));
-ok('모르는 장소는 일반(반사 0)', near(cp({ place: 'moon' }).vitd, 6.25, 0.001));
+ok('눈 위(반사 0.8) → 비타민D · 화상 둘 다 ÷1.8', near(snow.vitd, B / 1.8, 0.001) && near(snow.burn, 300 / 10.5 / 1.8, 0.001));
+ok('바닷가 반사 0.05 (Diffey & Mobley 2018)', Engine.PLACES.sea.r === 0.05 && near(cp({ place: 'sea' }).vitd, B / 1.05, 0.001));
+ok('모르는 장소는 일반(반사 0)', near(cp({ place: 'moon' }).vitd, B, 0.001));
 ok('비 오는 시간은 창이 닫힌다', Engine.isOpen(60, cp({ rain: true })) === false && Engine.isOpen(60, cp({})) === true);
 
 var day = 86400000, now0 = new Date(2026, 9, 4, 20, 0).getTime();
@@ -88,10 +74,11 @@ ok('평소 시각: 14일보다 오래된 기록은 안 센다',
 
 /* ---------- 2. §3 열 안전 상한 구간표 ---------- */
 log('── 2. §3 체감온도 구간');
-ok('체감 <33℃ → 제한 없음 (기상청 폭염주의보 기준)', Engine.heatCap(32).minutes === Infinity);
-ok('33~35℃ → 20분',        Engine.heatCap(34).minutes === 20);
-ok('35~38℃ → 10분',        Engine.heatCap(36).minutes === 10);
-ok('38℃~ → 0분 (노출 금지)', Engine.heatCap(39).minutes === 0);
+ok('체감 <33℃ → 제한 없음', Engine.heatCap(32).minutes === Infinity && Engine.heatCap(32).level === 0);
+ok('33~35℃ (폭염주의보) → 분 상한 없이 짧게 안내', Engine.heatCap(34, 12 * 60).minutes === Infinity && Engine.heatCap(34).level === 1);
+ok('35~38℃ (폭염경보) → 오후 2~5시만 막음 (고용노동부 2026)',
+   Engine.heatCap(36, 15 * 60).minutes === 0 && Engine.heatCap(36, 11 * 60).minutes === Infinity && Engine.heatCap(36, 17 * 60).minutes === Infinity);
+ok('38℃~ (폭염중대경보) → 나가지 않기', Engine.heatCap(39, 9 * 60).minutes === 0);
 ok('Heat Index 32℃/70% ≈ 41℃', near(Engine.heatIndex(32, 70), 41, 1.5),
    '실제 ' + Engine.heatIndex(32, 70).toFixed(1));
 
