@@ -102,6 +102,7 @@ var AdminStats = (function () {
       return {
         uid: uid, notify: !!(roster[uid] && roster[uid].notify),
         sido: roster[uid] && roster[uid].sido, skinType: roster[uid] && roster[uid].skinType,
+        ageGroup: roster[uid] && roster[uid].ageGroup, bmiGroup: roster[uid] && roster[uid].bmiGroup,
         week: week, total: sum(week), days: keys.length, stamps: stamps, goals: goals,
         pcts: pcts, gap: gap, retained: retained, hasData: keys.length > 0
       };
@@ -155,8 +156,34 @@ var AdminStats = (function () {
       improved: improved,
       notify: { on: on.length, off: off.length, onMean: perWeek(on), offMean: perWeek(off) },   // 가입 기록이 없는 참가자는 알림 설정을 알 수 없어 뺀다
       limited: limited, ended: ended,
-      sido: dist('sido'), skin: dist('skinType')
+      sido: dist('sido'), skin: dist('skinType'),
+      byAge: byGroup(people, 'ageGroup', AGE_GROUPS, weeks),
+      byBmi: byGroup(people, 'bmiGroup', BMI_GROUPS, weeks)
     };
+  }
+
+  /* ---------- 연령대 · BMI 구간별 (users 문서의 ageGroup · bmiGroup — 원값은 앱이 보내지 않는다) ---------- */
+  var AGE_GROUPS = [[10, '10대'], [20, '20대'], [30, '30대'], [40, '40대'], [50, '50대'], [60, '60대'], [70, '70대 이상']];
+  var BMI_GROUPS = [['under', '저체중'], ['normal', '정상'], ['pre', '비만 전단계'], ['obese1', '1단계 비만'], ['obese2', '2단계 비만 이상']];
+
+  function byGroup(people, key, order, weeks) {
+    var out = order.map(function (g) { return { key: g[0], label: g[1], list: [] }; });
+    var none = { key: null, label: '입력 안 함', list: [] };
+    people.forEach(function (p) {
+      var row = null;
+      for (var i = 0; i < out.length; i++) if (out[i].key === p[key]) row = out[i];
+      (row || none).list.push(p);
+    });
+    return out.concat([none]).filter(function (g) { return g.list.length; }).map(function (g) {
+      var l = g.list;
+      return {
+        label: g.label, n: l.length,
+        withData: l.filter(function (p) { return p.hasData; }).length,
+        weekMean: weeks ? mean(l.map(function (p) { return p.total / weeks; })) : NaN,
+        goalsMean: mean(l.map(function (p) { return p.goals; })),
+        retained: l.filter(function (p) { return p.retained; }).length
+      };
+    });
   }
 
   return {

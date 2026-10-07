@@ -38,6 +38,12 @@ var AdminDemo = (function () {
         }
       }
     }
+    /* 연령대 · BMI 구간 — 위 난수 순서를 바꾸지 않도록 따로 뽑는다. 몇 명은 입력 안 함 */
+    var r2 = rng(19), ages = [20, 20, 20, 20, 30, 10, 40, 50], bmis = ['normal', 'normal', 'normal', 'under', 'pre', 'obese1', 'obese2'];
+    users.forEach(function (u) {
+      if (r2() < 0.88) u.ageGroup = ages[Math.floor(r2() * ages.length)];
+      if (r2() < 0.8) u.bmiGroup = bmis[Math.floor(r2() * bmis.length)];
+    });
     return { users: users, sessions: sessions, n: N, start: START, weeks: WEEKS };
   }
 
