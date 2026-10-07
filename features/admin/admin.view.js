@@ -232,6 +232,17 @@ var AdminView = (function () {
     }).join('') + '</div>';
   }
 
+  /* 연령대 · BMI 구간별 표 — 사람 수가 적은 칸은 평균이 크게 흔들리니 숫자만 참고한다 */
+  function groupTable(list) {
+    if (!list.length) return empty();
+    var small = list.some(function (g) { return g.n < 5; });
+    return table(['구간', '사람', '타이머 쓴 사람', '일주일 평균(분)', '목표 다 채운 날', '2주 넘게 사용'],
+      list.map(function (g) {
+        return [esc(g.label), g.n + '명', g.withData + '명', fmt(g.weekMean), fmt(g.goalsMean) + '일', g.retained + '명'];
+      })) +
+      (small ? '<p class="ad-muted">5명보다 적은 구간은 평균이 크게 흔들려요. 비교보다 참고용으로 봐 주세요.</p>' : '');
+  }
+
   /* ---------- 공통 조각 ---------- */
   function card(title, body, sub) {
     return '<section class="ad-card"><div class="ad-card-h"><h3>' + title + '</h3>' + (sub ? '<span class="ad-muted">' + sub + '</span>' : '') + '</div>' + body + '</section>';
@@ -311,6 +322,8 @@ var AdminView = (function () {
         ])) +
         card(c.stampMin + '분 이상 쬔 날이 며칠인 사람이 몇 명?', groups(rec.stamps), '예: 8~14일 줄의 숫자 = 그만큼 쬔 사람 수') +
         card('하루 목표를 다 채운 날이 며칠인 사람이 몇 명?', groups(rec.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
+        card('연령대별', groupTable(rec.byAge), '온보딩에서 입력한 나이를 10살 단위로 묶었어요') +
+        card('BMI 구간별', groupTable(rec.byBmi), '대한비만학회 기준 · 저체중 18.5 미만 · 정상 23 미만 · 비만 전단계 25 미만 · 1단계 비만 30 미만') +
       '</div>' +
       card('사람별 기록', '<div class="ad-bar-r"><span class="ad-muted">이름 대신 익명 ID 앞 6자리만 보여요.</span>' +
           '<button class="ad-btn sm sub" id="ad-csv">기록 CSV 내려받기</button></div>' +
