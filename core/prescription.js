@@ -55,6 +55,7 @@ var Prescription = (function () {
 
     var mode = Engine.decideMode({
       maxAltitude: maxAltitude,
+      maxUvi: scanned.reduce(function (m, p) { return Math.max(m, p.uvi || 0); }, 0),
       maxHeatIndexC: maxHeatIndexC,
       windows: allWindows
     });
@@ -99,7 +100,7 @@ var Prescription = (function () {
     /* 오늘 낮(고도 45° 이상) 표본이 아예 없는지.
        저녁에 조회하면 기상청 발표 특성상 예보가 밤 시간만 남아,
        "자외선이 약하다"가 아니라 "판정할 낮 자료 자체가 없다"가 된다. */
-    rx.hasDaytimeData = rx.scanned.some(function (p) { return p.altitude >= 45; });
+    rx.hasDaytimeData = rx.scanned.some(function (p) { return p.altitude > 0 && p.uvi > 0; });
     rx.isNightNow = sunAltAt(rx, nowM) < 0;
 
     /* 오늘 남은 창이 없으면 내일을 미리 뽑아 둔다 (§9 "내일 아침 창 제시").

@@ -10,9 +10,19 @@ var Engine = (function () {
   /* 비타민D 시간 — Sánchez-Pérez 외(2024, Heliyon 10:e30864) 식 4·6·9 그대로 (McKenzie 계열)
        t = MED ÷ (k × R × 자외선지수 × 노출 비율)
        k = 12.5 J/m²·min : 피부 타입 Ⅱ가 온몸을 드러내고 자외선지수 10, R = 2일 때 1,000 IU에 약 1분 (논문 유도값)
-       R = 1.3121 × 자외선지수^-0.1722 : 비타민D 유효 자외선 ÷ 홍반 유효 자외선 (식 6) */
+       R = 1.3121 × 자외선지수^0.1722 : 비타민D 유효 자외선 ÷ 홍반 유효 자외선 (식 6)
+         지수는 양수다 — 식 7이 16.40 × UVI^1.1722 이고, k를 정할 때 UVI 10에서 R ≈ 2라고 했다. */
   var K_VITD = 12.5;
-  function vitdRatio(uvi) { return 1.3121 * Math.pow(uvi, -0.1722); }
+  function vitdRatio(uvi) { return 1.3121 * Math.pow(uvi, 0.1722); }
+
+  /* 햇빛 시간이 열리는 최소 자외선지수.
+     예전에는 '태양고도 45° 이상'(그림자가 키보다 짧을 때)이라는 어림 규칙을 썼는데,
+     서울은 10월 중순~2월에 한낮에도 45°에 못 미쳐 시간이 아예 안 나왔다.
+     실제 계산은 자외선지수로 하므로, 고도 대신 자외선지수로 거른다. */
+  var MIN_UVI = 2;
+  /* 기상청 자외선지수는 3시간 간격이라 이른 아침·늦은 오후는 보간값이 실제보다 높게 나온다.
+     해가 낮을 때(20° 미만)는 UVB가 거의 없으므로 함께 거른다. */
+  var MIN_ALT = 20;
 
   /* UVI → 분 단위 환산계수. 자외선지수 1 = 25 mW/m² (WHO·WMO·UNEP·ICNIRP)
      0.025 W/m² × 60초 = 1.5 */
@@ -147,7 +157,8 @@ var Engine = (function () {
 
   /* ---------- §2 창이 열리는 조건 (넷 다 만족해야 함) ---------- */
   function isOpen(altitudeDeg, r) {
-    return altitudeDeg >= 45          // 1. 그림자가 키보다 짧다 = UVB 도달
+    return altitudeDeg >= MIN_ALT     // 1. 해가 충분히 떠 있고
+        && r.uvi >= MIN_UVI           //    자외선지수가 MIN_UVI 이상
         && r.heat > 0                 // 2. 열 안전 상한 > 0
         && r.minutes <= 60            // 3. 60분 넘으면 비현실적이라 창을 안 냄
         && !r.rain;                   // 4. 비·눈 예보 시간은 뺀다 (기상청 강수형태 PTY)
@@ -241,11 +252,14 @@ var Engine = (function () {
   }
 
   /* ---------- §4 기상·계절 모드 (판정 순서대로, 첫 히트 적용) ---------- */
-  function decideMode(ctx) {   // ctx: {maxAltitude, maxHeatIndexC, windows}
-    if (ctx.maxAltitude < 45) {
+  function decideMode(ctx) {   // ctx: {maxAltitude, maxUvi, maxHeatIndexC, windows}
+    var weak = ctx.maxUvi != null ? ctx.maxUvi < MIN_UVI : ctx.maxAltitude < 45;
+    if (weak) {
       return {
         id: 'winter', label: '겨울',
-        reason: '오늘 최대 태양고도 ' + ctx.maxAltitude.toFixed(0) + '° — 45°에 못 미칩니다',
+        reason: ctx.maxUvi != null
+          ? '오늘 최고 자외선지수 ' + ctx.maxUvi.toFixed(1) + ' — ' + MIN_UVI + '에 못 미칩니다'
+          : '오늘 최대 태양고도 ' + ctx.maxAltitude.toFixed(0) + '° — 45°에 못 미칩니다',
         headline: '오늘은 햇빛으로 비타민D를 만들 수 없어요',
         windows: []
       };
@@ -358,7 +372,7 @@ var Engine = (function () {
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
   return {
-    K_VITD: K_VITD, vitdRatio: vitdRatio, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING,
+    K_VITD: K_VITD, vitdRatio: vitdRatio, MIN_UVI: MIN_UVI, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING,
     PLACES: PLACES, bmi: bmi,
     personal: personal, habitMinute: habitMinute,
     HALF_LIFE_DAYS: HALF_LIFE_DAYS, LIMIT_LABEL: LIMIT_LABEL,

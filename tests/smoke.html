@@ -31,17 +31,18 @@ function near(a, b, tol) { return Math.abs(a - b) <= tol; }
 
 /* ---------- 1. 엔진 단위 검증 (Sánchez-Pérez 외 2024 식 손계산 대조) ---------- */
 log('── 1. 엔진 · 비타민D · 화상 공식');
-/* 논문 식 4·6·9 : t = MED ÷ (12.5 × R × UVI × (1+반사) × 노출 비율),  R = 1.3121 × UVI^-0.1722 */
-function vt(med, uvi, f, refl) { return med / (12.5 * 1.3121 * Math.pow(uvi, -0.1722) * uvi * (1 + (refl || 0)) * f); }
-ok('R(UVI 7) = 1.3121 × 7^-0.1722 ≈ 0.9385 (식 6)', near(Engine.vitdRatio(7), 0.9385, 0.0005), Engine.vitdRatio(7).toFixed(4));
+/* 논문 식 4·6·9 : t = MED ÷ (12.5 × R × UVI × (1+반사) × 노출 비율),  R = 1.3121 × UVI^0.1722 */
+function vt(med, uvi, f, refl) { return med / (12.5 * 1.3121 * Math.pow(uvi, 0.1722) * uvi * (1 + (refl || 0)) * f); }
+ok('R(UVI 7) = 1.3121 × 7^0.1722 ≈ 1.834 (식 6)', near(Engine.vitdRatio(7), 1.8340, 0.0005), Engine.vitdRatio(7).toFixed(4));
+ok('R(UVI 10) ≈ 2 (논문이 k를 정할 때 쓴 값)', near(Engine.vitdRatio(10), 1.95, 0.01), Engine.vitdRatio(10).toFixed(3));
 var r = Engine.computePoint({ uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
-ok('타입Ⅲ · UVI 7 · 반팔반바지(0.63) ≈ 5.8분', near(r.vitd, vt(300, 7, 0.63), 0.001) && near(r.vitd, 5.80, 0.01), '실제 ' + r.vitd.toFixed(3));
+ok('타입Ⅲ · UVI 7 · 반팔반바지(0.63) ≈ 3.0분', near(r.vitd, vt(300, 7, 0.63), 0.001) && near(r.vitd, 2.97, 0.01), '실제 ' + r.vitd.toFixed(3));
 ok('화상 = 300 ÷ (1.5×7) ≈ 28.6분 (식 2)', near(r.burn, 300 / 10.5, 0.001), '실제 ' + r.burn.toFixed(3));
 ok('최종 = min(비타민D, 화상) → 비타민D 기준', near(r.minutes, r.vitd, 0.001) && r.limitedBy === 'vitd');
 
 var r2 = Engine.computePoint({ uvi: 7, tempC: 25, rh: 50, skinType: 3, clothing: 'longLong' });
-ok('긴팔긴바지(얼굴·손 0.10) = 약 36.5분', near(r2.vitd, vt(300, 7, 0.10), 0.001), '실제 ' + r2.vitd.toFixed(2));
-ok('이 경우 화상 한계(28.6분)가 먼저 와서 목표를 못 채움', r2.limitedBy === 'burn');
+ok('긴팔긴바지(얼굴·손 0.10) = 약 18.7분', near(r2.vitd, vt(300, 7, 0.10), 0.001), '실제 ' + r2.vitd.toFixed(2));
+ok('긴팔긴바지도 화상 한계(28.6분)보다 짧아 목표를 채움', r2.limitedBy === 'vitd');
 
 var r3 = Engine.computePoint({ uvi: 0, tempC: 25, rh: 50, skinType: 3, clothing: 'shortShort' });
 ok('UVI 0 → 무한대(창 안 열림)', !isFinite(r3.minutes));
@@ -124,11 +125,14 @@ ok('나머지는 평상',     Engine.decideMode({ maxAltitude: 70, maxHeatIndexC
 
 /* ---------- 5. 창 열림 3조건 ---------- */
 log('── 5. 창이 열리는 조건');
-var okr = { heat: Infinity, minutes: 20 };
-ok('고도 44° → 닫힘', Engine.isOpen(44, okr) === false);
-ok('고도 46° → 열림', Engine.isOpen(46, okr) === true);
-ok('열 상한 0 → 닫힘', Engine.isOpen(60, { heat: 0, minutes: 5 }) === false);
-ok('필요시간 61분 → 닫힘', Engine.isOpen(60, { heat: Infinity, minutes: 61 }) === false);
+var okr = { heat: Infinity, minutes: 20, uvi: 3 };
+ok('해가 낮을 때(고도 20° 미만) → 닫힘', Engine.isOpen(15, okr) === false && Engine.isOpen(-1, okr) === false);
+ok('고도 40°라도 자외선지수 3이면 열림 (10~2월 서울)', Engine.isOpen(40, okr) === true);
+ok('자외선지수 2 미만 → 닫힘', Engine.isOpen(40, { heat: Infinity, minutes: 20, uvi: 1.9 }) === false);
+ok('열 상한 0 → 닫힘', Engine.isOpen(60, { heat: 0, minutes: 5, uvi: 5 }) === false);
+ok('필요시간 61분 → 닫힘', Engine.isOpen(60, { heat: Infinity, minutes: 61, uvi: 5 }) === false);
+ok('최고 자외선지수 1.5인 날 → 겨울 모드', Engine.decideMode({ maxAltitude: 40, maxUvi: 1.5, maxHeatIndexC: 15, windows: [] }).id === 'winter');
+ok('고도 40°라도 최고 자외선지수 3이면 겨울 모드 아님', Engine.decideMode({ maxAltitude: 40, maxUvi: 3, maxHeatIndexC: 15, windows: [{ recommendStart: 720 }] }).id === 'normal');
 
 /* ---------- 6. 저장소 · 충전률 · 반감기 ---------- */
 log('── 6. 저장소 · 충전률');
@@ -254,7 +258,7 @@ log('        창 ' + rx.windows.length + '개' +
     }).join(''));
 
 rx.windows.forEach(function (x) {
-  ok('창 내부 고도 ≥45°', x.best.altitude >= 45, x.best.altitude.toFixed(1) + '°');
+  ok('창 내부 자외선지수 ≥ ' + Engine.MIN_UVI, x.best.uvi >= Engine.MIN_UVI, x.best.uvi.toFixed(1));
   ok('창 내부 필요시간 ≤60분', x.recommendMinutes <= 60, x.recommendMinutes + '분');
 });
 ok('열 안전 상한이 §3 NOAA Heat Index로 계산됨 (기상청은 체감온도를 안 줌)',
