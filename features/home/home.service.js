@@ -199,11 +199,11 @@ var HomeService = (function () {
      고도가 45°에 못 미쳐 창 자체가 막힌 날은 그 사실이 진짜 결정자이므로 한 줄 더 얹는다 */
   function limits(p, rx) {
     if (!p) return [];
-    var altBlocked = !!rx && rx.maxAltitude < 45;
+    var altBlocked = !!rx && rx.mode && rx.mode.id === 'winter';
     var rows = altBlocked ? [{
-      key: 'alt', icon: '📐', name: '태양고도',
-      value: rx.maxAltitude.toFixed(0) + '°',
-      note: '45° 이상이어야 UVB가 대기를 통과합니다 · 오늘 최대치',
+      key: 'alt', icon: '📐', name: '자외선지수',
+      value: rx.mode.reason,
+      note: '자외선지수 ' + Engine.MIN_UVI + ' 이상이어야 햇빛 시간을 내요 · 오늘 최대치',
       win: true
     }] : [];
     return rows.concat([
