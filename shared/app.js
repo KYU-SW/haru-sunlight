@@ -199,7 +199,14 @@ var App = (function () {
         ? '오늘은 더위 한계까지 다 쬐었어요 — 내일 다시 해요'
         : '오늘은 화상 한계까지 다 쬐었어요 — 내일 다시 해요');
     } else if (!TimerService.isRunning()) {
-      TimerService.start(rx, win || rx.activeWindow || rx.targetWindow);
+      /* 시작 전에 차림 · 쬐는 곳 · 지역을 확인하는 시트를 먼저 띄운다 (features/timer/timer.check.js) */
+      return TimerCheck.open(function () {
+        var now = prescription();
+        if (!now) return;
+        TimerService.start(now, win || now.activeWindow || now.targetWindow);
+        timerAllowed = true;
+        go('timer');
+      }, win);
     }
     timerAllowed = true;
     go('timer');

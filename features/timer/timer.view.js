@@ -163,14 +163,12 @@ var TimerView = (function () {
       if (over) return UI.toast(over === 'heat'
         ? '오늘은 더위 한계까지 다 쬐었어요 — 내일 다시 해요'
         : '오늘은 화상 한계까지 다 쬐었어요 — 내일 다시 해요');
-      TimerService.start(rx, rx.activeWindow || rx.targetWindow);
-      q('t-act-idle').hidden = true;
-      q('t-act-run').hidden = false;
-      var mode = el.querySelector('.top-mode');
-      mode.className = 'top-mode mode-normal';
-      mode.innerHTML = '<span class="dot"></span>노출 중';
-      update(TimerService.tick());
-      startLoop();
+      /* 시작 전에 차림 · 쬐는 곳 · 지역을 확인하는 시트 — '이대로 시작'을 눌러야 시작한다 */
+      TimerCheck.open(function () {
+        rx = App.prescription() || rx;          // 시트에서 바꾼 조건으로 다시 계산한 처방
+        TimerService.start(rx, rx.activeWindow || rx.targetWindow);
+        render(rx);                             // 차림 · 장소 버튼과 링을 새 값으로 다시 그리고 카운트 시작
+      });
     };
     q('t-stop').onclick = function () { end(false); };
     q('t-done').onclick = function () { end(true); };
