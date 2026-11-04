@@ -392,11 +392,20 @@ var AdminView = (function () {
     clearTimeout(toast.t); toast.t = setTimeout(function () { t.classList.remove('show'); }, 1800);
   }
 
+  /* CSV 칸 하나 — 엑셀이 = + - @ 로 시작하는 글자를 수식으로 실행하지 않게 앞에 ' 를 붙인다 */
+  function csvCell(v) {
+    if (v === undefined || v === null) return '';
+    if (typeof v === 'number') return String(v);
+    var t = String(v);
+    if (/^[=+\-@\t\r]/.test(t)) t = "'" + t;
+    return /[",\n\r]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
+  }
+
   /* 기록 CSV — 발표 자료·통계 프로그램용. 이름·이메일은 원래 없다. */
   function exportCsv() {
     var head = ['uid', 'dateKey', 'at', 'minutes', 'percent', 'clothing', 'limitedBy', 'endedBy'];
     var lines = [head.join(',')].concat(state.sessions.map(function (s) {
-      return head.map(function (k) { var v = s[k] === undefined ? '' : s[k]; return /[",\n]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : v; }).join(',');
+      return head.map(function (k) { return csvCell(s[k]); }).join(',');
     }));
     var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
