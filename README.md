@@ -2,7 +2,7 @@
 
 > 오늘 **언제, 몇 분** 햇빛을 쬐면 비타민D를 채울 수 있는지 알려 주는 웹앱
 
-`v_1.0` · 기본 기능 완성
+`v_1.1` · 기본 기능 완성
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html
@@ -54,8 +54,8 @@ python -m http.server 8762
 ### 날씨 자료 (기상청 API)
 
 - **키는 저장소 코드에 넣지 않습니다.** `config.js` 의 `KMA_SERVICE_KEY` 는 빈 값으로 둡니다.
-- **배포된 사이트:** 키를 넣지 않고 항상 중계 서버(Cloudflare Worker, `worker/`)로 받습니다.
-  공개 사이트의 `config.js` 는 누구나 열어 볼 수 있어서, 키는 중계 서버의 비밀값(`wrangler secret put KMA_SERVICE_KEY`)에만 둡니다.
+- **배포된 사이트:** `main` 에 올라오면 `.github/workflows/deploy-pages.yml` 이
+  저장소 비밀값(Settings → Secrets and variables → Actions)의 `KMA_SERVICE_KEY` 를 채워서 깃허브 페이지에 올립니다.
 - **로컬 개발:** `config.local.example.js` 를 `config.local.js` 로 복사해 서비스키를 넣습니다.
   `config.local.js` 는 `.gitignore` 에 있어 깃허브에 올라가지 않습니다.
 - 키가 없으면 `config.js` 의 중계 서버(Cloudflare Worker, `worker/`)로 받습니다.
@@ -121,4 +121,5 @@ tests/                테스트 · 모의 데이터 화면
 | `v_0.7` | 관리자 대시보드 — 연령대 · BMI 구간별 표 |
 | `v_0.8` | R 지수 부호 바로잡음(논문 식 6), 햇빛 시간 조건을 '고도 45°' → '자외선지수 2 이상 · 고도 20° 이상'으로 완화 (10~2월에도 시간 안내) |
 | `v_1.0` | **기본 기능 완성.** 타이머 시작 전 가운데 확인 창("혹시 어디 놀러 갔다가 피부가 타진 않았나요?") — '아니요'면 바로 시작, '네'면 지역 · 피부 타입 · 차림 · 쬐는 곳을 고치는 시트(고르면 필요한 시간이 바로 다시 계산) |
+| `v_1.1` | 코드 리뷰 수정 — 타이머(화면 꺼짐 · 탭 이동 · 새로고침에도 계속 셈), 안드로이드 알림(서비스 워커), 계산 예외 처리, 기록 중복 업로드 방지 · Firestore 규칙 형식 검사 · CSV 수식 주입 방지, 중계 서버 요청 범위 제한 |
 | `v_2.0` | (예정) 새 메인 기능 |
