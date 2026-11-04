@@ -85,6 +85,7 @@ var App = (function () {
         state.stale = res.stale;
         state.loading = false;
         invalidate();
+        resumeTimer();
         if (state.profile.notify) Notify.schedule(prescription());
         go(state.tab);
         scheduleHourly();
@@ -94,6 +95,18 @@ var App = (function () {
         state.error = err;
         refreshView();   // 설정 탭이면 renderError 대신 SettingsView가 뜨도록 분기를 태운다
       });
+  }
+
+  /* 새로고침·앱 종료 전에 돌던 타이머를 이어 간다 (TimerService.restore) */
+  function resumeTimer() {
+    var r = TimerService.restore(prescription());
+    if (!r) return;
+    if (r.finished) {
+      invalidate();
+      UI.toast('지난번 타이머를 ' + r.finished.minutes + '분으로 기록했어요');
+      return;
+    }
+    TimerView.ensureLoop();
   }
 
   /* 예보 다시 받기. 호출부가 성공/실패를 알 수 있도록 Promise를 돌려준다
@@ -156,7 +169,6 @@ var App = (function () {
       try { history.replaceState(null, '', '#' + tab); } catch (e) {}
     }
     applyActiveTab(tab);
-    if (tab !== 'timer') TimerView.stopLoop();
     scrollTop();
     refreshView();
     syncScrolled();              // 탭을 바꾸면 맨 위라 선이 바로 사라진다(스크롤 이벤트는 한 박자 늦게 온다)
@@ -204,6 +216,7 @@ var App = (function () {
         var now = prescription();
         if (!now) return;
         TimerService.start(now, win || now.activeWindow || now.targetWindow);
+        TimerView.ensureLoop();
         timerAllowed = true;
         go('timer');
       }, win);

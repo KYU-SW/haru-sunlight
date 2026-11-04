@@ -39,6 +39,36 @@ var TimerService = (function () {
     return l.burn >= 1 ? 'burn' : l.heat >= 1 ? 'heat' : null;
   }
 
+  /* 진행 중 세션을 기기에 저장한다 — 새로고침·앱 종료·백그라운드 정리로 메모리가 날아가도
+     다시 열면 이어서 셀 수 있게. 처방(rx)은 크고 다시 계산할 수 있으므로 날짜만 남긴다. */
+  var SAVE_FIELDS = ['window', 'running', 'startedAt', 'lastTick', 'elapsedSec',
+                     'dose', 'carried', 'extra', 'burnDose', 'heatDose', 'limitedBy'];
+  function save() {
+    if (!st) return Repo.clearTimer();
+    var o = { dateKey: st.rx.dateKey, tz: st.rx.tz };
+    SAVE_FIELDS.forEach(function (k) { o[k] = st[k]; });
+    Repo.setTimer(o);
+  }
+
+  /* 앱을 다시 열었을 때 — 저장된 세션이 있으면 이어 간다.
+     같은 날이면 지금 처방으로 이어서 세고(화면이 꺼져 있던 시간도 tick이 채운다),
+     날짜가 바뀌었으면 그때까지 쬔 만큼만 그날 기록으로 남기고 끝낸다. */
+  function restore(rx) {
+    if (st) return null;
+    var o = Repo.getTimer();
+    if (!o || !o.running || !o.dateKey) { Repo.clearTimer(); return null; }
+    st = {};
+    SAVE_FIELDS.forEach(function (k) { st[k] = o[k]; });
+    st.last = null;
+    if (rx && rx.dateKey === o.dateKey && rx.scanned) {
+      st.rx = rx;
+      return tick();
+    }
+    st.rx = { dateKey: o.dateKey, tz: o.tz };
+    st.running = false;
+    return { finished: finish() };
+  }
+
   function start(rx, win) {
     var carried = carriedToday(rx);
     var load = loadToday(rx);
@@ -62,16 +92,24 @@ var TimerService = (function () {
     return st;
   }
 
+
   function stop() {
     if (!st) return null;
     st.running = false;
     return finish();
   }
 
-  /* 현재 프로필(옷차림·SPF·피부) 기준으로 '지금' 값을 다시 계산 */
-  function currentPoint() {
+  /* 시각(ms) → 예보 지점 현지 기준 '그날 몇 분' (Prescription.localNow와 같은 방식) */
+  function minuteAt(ms) {
+    var d = new Date(ms);
+    var loc = new Date(ms + d.getTimezoneOffset() * 60000 + (st.rx.tz || 0) * 3600000);
+    return loc.getHours() * 60 + loc.getMinutes() + loc.getSeconds() / 60;
+  }
+
+  /* 현재 프로필(옷차림·SPF·피부) 기준으로 '지금'(또는 atMs 시각) 값을 다시 계산 */
+  function currentPoint(atMs) {
     var profile = Repo.getProfile();
-    var nowM = Prescription.localNow(st.rx.tz).minute;   // 예보 지점 현지 시각
+    var nowM = atMs != null ? minuteAt(atMs) : Prescription.localNow(st.rx.tz).minute;   // 예보 지점 현지 시각
     var p = Prescription.pointAt(st.rx, nowM);
     var o = { uvi: p.uvi, tempC: p.tempC, rh: p.rh, minuteOfDay: nowM };
     var me = Engine.personal(profile);
@@ -82,24 +120,48 @@ var TimerService = (function () {
     return r;
   }
 
+  /* 화면이 꺼지거나 탭이 백그라운드로 가면 브라우저가 1초 루프를 멈춘다.
+     돌아왔을 때 벌어진 시간을 버리지 않고 1분씩 잘라 그 시각의 조건으로 쌓는다.
+     중간에 목표·안전 한계에 닿으면 거기서 멈춘다(그 뒤는 쬔 것으로 치지 않는다). */
+  var STEP_SEC = 60;
+  var MAX_GAP_SEC = 4 * 3600;    // 이보다 길게 비면 타이머를 켜 둔 채 잊은 것으로 보고 거기까지만 센다
+
+  function accumulate(p, dt) {
+    st.elapsedSec += dt;
+    var reqSec = p.vitd * 60;
+    if (isFinite(reqSec) && reqSec > 0) st.dose += dt / reqSec;
+    /* 화상·더위도 같은 방식으로 '몫'을 쌓는다 — 조건이 바뀌면 쌓이는 속도도 바뀐다 */
+    var burnSec = p.burn * 60, heatSec = p.heat * 60;
+    if (isFinite(burnSec) && burnSec > 0) st.burnDose += dt / burnSec;
+    if (isFinite(heatSec) && heatSec > 0) st.heatDose += dt / heatSec;
+  }
+
   function tick() {
     if (!st) return null;
     var now = Date.now();
-    var dt = Math.min(60, (now - st.lastTick) / 1000);   // 탭 복귀 시 폭주 방지
+    var gap = Math.max(0, Math.min(MAX_GAP_SEC, (now - st.lastTick) / 1000));
+    var from = st.lastTick;
     st.lastTick = now;
 
-    var p = currentPoint();
-    st.last = p;
-
     if (st.running) {
-      st.elapsedSec += dt;
-      var reqSec = p.vitd * 60;
-      if (isFinite(reqSec) && reqSec > 0) st.dose += dt / reqSec;
-      /* 화상·더위도 같은 방식으로 '몫'을 쌓는다 — 조건이 바뀌면 쌓이는 속도도 바뀐다 */
-      var burnSec = p.burn * 60, heatSec = p.heat * 60;
-      if (isFinite(burnSec) && burnSec > 0) st.burnDose += dt / burnSec;
-      if (isFinite(heatSec) && heatSec > 0) st.heatDose += dt / heatSec;
+      var t = 0;
+      while (gap - t > 0) {
+        var dt = Math.min(STEP_SEC, gap - t);
+        var last = gap - t <= STEP_SEC;
+        /* 마지막 조각은 '지금' 조건, 그 앞은 그 1분의 가운데 시각 조건 */
+        var pm = last ? currentPoint() : currentPoint(from + (t + dt / 2) * 1000);
+        st.last = pm;
+        var left = snapshot().remainingSec;
+        if (left <= 0) break;
+        accumulate(pm, Math.min(dt, left));   // 한계에 닿는 순간까지만 센다
+        t += dt;
+      }
+      st.last = currentPoint();
+    } else {
+      st.last = currentPoint();
     }
+    st.limitedBy = snapshot().limitedBy;
+    save();
     return snapshot();
   }
 
@@ -135,7 +197,8 @@ var TimerService = (function () {
 
   /* 종료 처리 — 이력 기록까지 (§9 주간 화면 반영) */
   function finish() {
-    var s = snapshot();
+    /* 날짜가 바뀐 뒤 복원한 세션은 그날 처방이 없어 지금 값을 계산할 수 없다 — 저장해 둔 결정 요인을 쓴다 */
+    var s = st.rx.scanned ? snapshot() : { limitedBy: st.limitedBy || 'vitd' };
     var minutes = Math.max(1, Math.round(st.elapsedSec / 60));
     /* 기록에는 '이번에 더 채운 몫'만 더한다 — 이어 간 몫까지 더하면 두 번 세어진다 */
     var percent = Math.min(300, Math.max(0, Math.round((st.dose - st.carried) * 100)));
@@ -155,13 +218,14 @@ var TimerService = (function () {
 
     var out = { minutes: minutes, percent: percent, limitedBy: s.limitedBy };
     st = null;
+    Repo.clearTimer();
     return out;
   }
 
-  function reset() { st = null; }
+  function reset() { st = null; Repo.clearTimer(); }
 
   return {
-    start: start, stop: stop, tick: tick, snapshot: snapshot,
+    start: start, stop: stop, tick: tick, snapshot: snapshot, restore: restore,
     isRunning: isRunning, session: session, reset: reset,
     currentPoint: currentPoint, carriedToday: carriedToday, loadToday: loadToday, exhausted: exhausted,
     HEAT_RECOVERY_HALF_LIFE_MIN: HEAT_RECOVERY_HALF_LIFE_MIN

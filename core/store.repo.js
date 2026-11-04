@@ -25,7 +25,8 @@ var Repo = (function () {
   function read(key, fallback) {
     try {
       var v = localStorage.getItem(NS + key);
-      return v ? JSON.parse(v) : fallback;
+      var o = v ? JSON.parse(v) : null;
+      return o == null ? fallback : o;     // 저장값이 'null' 문자열이어도 기본값으로
     } catch (e) { return fallback; }
   }
   function write(key, value) {
@@ -87,8 +88,13 @@ var Repo = (function () {
   function getWeatherCache() { return read('weather', null); }
   function setWeatherCache(obj) { write('weather', obj); }
 
+  /* 진행 중인 타이머 세션 — 새로고침·앱 종료 뒤에도 이어 가기 위해 (TimerService) */
+  function getTimer() { return read('timer', null); }
+  function setTimer(o) { write('timer', o); }
+  function clearTimer() { try { localStorage.removeItem(NS + 'timer'); } catch (e) {} }
+
   function reset() {
-    ['profile', 'location', 'daily', 'load', 'sessions', 'weather'].forEach(function (k) {
+    ['profile', 'location', 'daily', 'load', 'sessions', 'weather', 'timer'].forEach(function (k) {
       try { localStorage.removeItem(NS + k); } catch (e) {}
     });
   }
@@ -100,6 +106,7 @@ var Repo = (function () {
     getLoad: getLoad, getDayLoad: getDayLoad, setDayLoad: setDayLoad,
     getSessions: getSessions, addSession: addSession,
     getWeatherCache: getWeatherCache, setWeatherCache: setWeatherCache,
+    getTimer: getTimer, setTimer: setTimer, clearTimer: clearTimer,
     reset: reset
   };
 })();

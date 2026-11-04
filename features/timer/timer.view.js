@@ -204,17 +204,30 @@ var TimerView = (function () {
     }
   }
 
-  /* ---------- 루프 ---------- */
+  /* ---------- 루프 ----------
+     타이머 화면이 아닐 때(홈 등)도 계속 돈다 — 안 그러면 목표·안전 한계에 닿아도
+     자동으로 끝나지 않고 알림도 안 온다. 화면에 없는 값은 update()가 알아서 건너뛴다. */
+  function step() {
+    var s = TimerService.tick();
+    if (!s) return stopLoop();
+    update(s);
+    if (s.done) end(true);
+  }
   function startLoop() {
     stopLoop();
-    loop = setInterval(function () {
-      var s = TimerService.tick();
-      if (!s) return stopLoop();
-      update(s);
-      if (s.done) end(true);
-    }, 1000);
+    loop = setInterval(step, 1000);
   }
   function stopLoop() { if (loop) { clearInterval(loop); loop = null; } }
+
+  /* 세션이 돌고 있으면 루프를 켠다 — 화면을 그리지 않고 시작·복원한 경우에 쓴다 */
+  function ensureLoop() {
+    if (TimerService.isRunning() && !loop) startLoop();
+  }
+
+  /* 폰 화면을 켜거나 앱으로 돌아오면 1초를 기다리지 않고 바로 그동안의 시간을 채운다 */
+  document.addEventListener('visibilitychange', function () {
+    if (!document.hidden && TimerService.isRunning()) step();
+  });
 
   function update(s) {
     var q = function (id) { return document.getElementById(id); };
@@ -285,6 +298,7 @@ var TimerView = (function () {
 
   function end(completed) {
     stopLoop();
+    el = el || document.getElementById('screen-timer');
     var out = TimerService.stop();
     if (out) {
       if (completed) Notify.done(out.minutes, out.percent);
@@ -294,8 +308,9 @@ var TimerView = (function () {
     }
     App.invalidate();
     rx = App.prescription() || rx;
-    paint();
+    if (rx) paint();
+    if (App.state && App.state.tab !== 'timer') App.refreshView();   // 홈에 있었다면 오늘 충전률을 바로 반영
   }
 
-  return { render: render, stopLoop: stopLoop };
+  return { render: render, stopLoop: stopLoop, ensureLoop: ensureLoop };
 })();
