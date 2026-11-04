@@ -138,7 +138,8 @@ var Engine = (function () {
     var heat = heatCap(hi, o.minuteOfDay);
 
     var minutes = Math.min(vitd, burn, heat.minutes);
-    var limitedBy = minutes === heat.minutes ? 'heat' : (minutes === burn ? 'burn' : 'vitd');
+    var limitedBy = !isFinite(minutes) ? 'vitd'     // 자외선 0 — 셋 다 무한대면 '열'로 잘못 고르지 않는다
+                  : minutes === heat.minutes ? 'heat' : (minutes === burn ? 'burn' : 'vitd');
 
     return {
       minutes: minutes,
@@ -170,8 +171,10 @@ var Engine = (function () {
     var out = [];
     for (var i = 0; i < hourly.length - 1; i++) {
       var a = hourly[i], b = hourly[i + 1];
-      for (var t = 0; t < 60; t += stepMin) {
-        var w = t / 60;
+      /* 보통 60분 간격이지만, 기온·습도가 빠진 시각은 걸러져 간격이 벌어질 수 있다 */
+      var span = Math.max(stepMin, b.minuteOfDay - a.minuteOfDay);
+      for (var t = 0; t < span; t += stepMin) {
+        var w = t / span;
         out.push({
           minuteOfDay: a.minuteOfDay + t,
           uvi:   a.uvi   + (b.uvi   - a.uvi)   * w,

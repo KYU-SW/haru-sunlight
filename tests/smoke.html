@@ -173,6 +173,22 @@ log('── 8. 기상청 좌표 변환 (KmaGeo)');
 ok('국내 좌표 판정 — 서울은 국내', KmaGeo.inKorea(37.57, 126.98) === true);
 ok('국내 좌표 판정 — 도쿄는 국외', KmaGeo.inKorea(35.68, 139.69) === false);
 ok('국내 좌표 판정 — 퀸즈타운은 국외', KmaGeo.inKorea(-45.03, 168.66) === false);
+ok('국내 좌표 판정 — 후쿠오카는 국외(사각형 안)', KmaGeo.inKorea(33.59, 130.40) === false);
+ok('국내 좌표 판정 — 평양은 국외', KmaGeo.inKorea(39.02, 125.75) === false);
+ok('국내 좌표 판정 — 울릉 · 백령 · 마라도는 국내',
+   KmaGeo.inKorea(37.48, 130.9) && KmaGeo.inKorea(37.97, 124.7) && KmaGeo.inKorea(33.12, 126.27));
+ok('국내 좌표 판정 — 지역 목록은 전부 국내',
+   KmaGeo.CITIES.every(function (c) { return KmaGeo.inKorea(c.lat, c.lon); }));
+(function () {
+  var g = Engine.interpolate([{ minuteOfDay: 540, uvi: 3, tempC: 20, rh: 50 },
+                              { minuteOfDay: 720, uvi: 6, tempC: 26, rh: 50 }], 10);
+  var p950 = g.filter(function (p) { return p.minuteOfDay === 590; })[0];
+  ok('보간 — 3시간 공백도 실제 간격으로 (09:50 = 3.83)', p950 && Math.abs(p950.uvi - 3.833) < 0.01,
+     p950 && p950.uvi.toFixed(2));
+  ok('보간 — 공백 구간도 10분마다 표본', g.length === 19, g.length + '개');
+})();
+ok('자외선 0 → 결정 요인은 비타민D(열로 잘못 고르지 않음)',
+   Engine.computePoint({ uvi: 0, tempC: 20, rh: 50, minuteOfDay: 600 }).limitedBy === 'vitd');
 
 /* ---------- 9. 기상청 응답 파싱·병합 (KmaProvider) ----------
    ⚠️ 실서비스키가 없어 네트워크 호출 대신, 공공데이터포털 문서(Swagger) 그대로의
