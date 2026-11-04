@@ -71,7 +71,10 @@ var WeatherAPI = (function () {
         return { data: data, stale: false, cached: false };
       })
       .catch(function (err) {
-        if (cache) return { data: cache, stale: true, cached: true, error: err };
+        /* 같은 위치의 캐시만 대신 쓴다 — 지역을 바꾼 뒤 실패하면 옛 지역 예보로 계산하면 안 된다 */
+        if (cache && cache.lat === loc.lat && cache.lon === loc.lon) {
+          return { data: cache, stale: true, cached: true, error: err };
+        }
         throw err;
       });
   }

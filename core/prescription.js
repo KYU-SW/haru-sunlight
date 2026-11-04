@@ -55,7 +55,9 @@ var Prescription = (function () {
 
     var mode = Engine.decideMode({
       maxAltitude: maxAltitude,
-      maxUvi: scanned.reduce(function (m, p) { return Math.max(m, p.uvi || 0); }, 0),
+      /* 자외선 자료를 못 받은 날은 0이 아니라 '모름' — 겨울 판정을 태양고도 기준으로 한다 */
+      maxUvi: weather.uvMissing ? null
+            : scanned.reduce(function (m, p) { return Math.max(m, p.uvi || 0); }, 0),
       maxHeatIndexC: maxHeatIndexC,
       windows: allWindows
     });

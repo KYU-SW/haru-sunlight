@@ -85,6 +85,7 @@ var App = (function () {
         state.stale = res.stale;
         state.loading = false;
         invalidate();
+        resumeTimer();
         if (state.profile.notify) Notify.schedule(prescription());
         go(state.tab);
         scheduleHourly();
@@ -94,6 +95,18 @@ var App = (function () {
         state.error = err;
         refreshView();   // 설정 탭이면 renderError 대신 SettingsView가 뜨도록 분기를 태운다
       });
+  }
+
+  /* 새로고침·앱 종료 전에 돌던 타이머를 이어 간다 (TimerService.restore) */
+  function resumeTimer() {
+    var r = TimerService.restore(prescription());
+    if (!r) return;
+    if (r.finished) {
+      invalidate();
+      UI.toast('지난번 타이머를 ' + r.finished.minutes + '분으로 기록했어요');
+      return;
+    }
+    TimerView.ensureLoop();
   }
 
   /* 예보 다시 받기. 호출부가 성공/실패를 알 수 있도록 Promise를 돌려준다
@@ -156,7 +169,6 @@ var App = (function () {
       try { history.replaceState(null, '', '#' + tab); } catch (e) {}
     }
     applyActiveTab(tab);
-    if (tab !== 'timer') TimerView.stopLoop();
     scrollTop();
     refreshView();
     syncScrolled();              // 탭을 바꾸면 맨 위라 선이 바로 사라진다(스크롤 이벤트는 한 박자 늦게 온다)
@@ -204,6 +216,7 @@ var App = (function () {
         var now = prescription();
         if (!now) return;
         TimerService.start(now, win || now.activeWindow || now.targetWindow);
+        TimerView.ensureLoop();
         timerAllowed = true;
         go('timer');
       }, win);
@@ -318,8 +331,10 @@ var App = (function () {
 
 document.addEventListener('DOMContentLoaded', function () {
   App.init();
-  /* 서비스 워커는 지금 등록하지 않는다.
-     초기 '캐시 우선' 워커 때문에 코드를 고쳐도 옛 화면이 계속 떠서,
-     sw.js를 자기 제거용으로 바꿔 두었다(이미 등록된 것만 스스로 정리된다).
-     오프라인 기능을 다시 켤 때 sw.js와 함께 이 등록을 되살리면 된다. */
+  /* 서비스 워커는 알림용으로만 등록한다(sw.js — 캐시 없음, 모든 요청은 네트워크로).
+     안드로이드 크롬은 워커를 거쳐야만 알림을 띄울 수 있다.
+     updateViaCache 'none' — 깃허브 페이지 캐시(10분) 때문에 sw.js 갱신이 늦어지지 않게 */
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
+  }
 });

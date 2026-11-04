@@ -13,7 +13,7 @@
    ========================================================= */
 var Sync = (function () {
 
-  var APP_VERSION = 'v_1.0';
+  var APP_VERSION = 'v_1.1';
   var KEY_UP = 'sunrx.uploaded';        // 올린 문서 ID 목록
   var KEY_USER = 'sunrx.userSynced';    // users 문서를 처음 만든 uid (createdAt을 한 번만 넣으려고)
   var CLOTHES = ['shortShort', 'shortLong', 'longLong'];
@@ -99,18 +99,21 @@ var Sync = (function () {
     return d;
   }
 
-  /* 동의한 뒤에 생긴 기록 중 아직 안 올린 것 */
+  /* 동의한 뒤에 생긴 기록 중 아직 안 올린 것.
+     한 기록은 어느 계정으로든 한 번만 올린다 — 로그아웃(새 익명 ID)하거나 다른 계정으로
+     로그인했을 때 이 기기의 옛 기록이 새 ID로 또 올라가면 같은 사람이 여러 명으로 집계된다. */
   function pending(uid) {
     var c = Repo.getProfile().consent;
     var since = (c && c.agreed && c.at) || Infinity;
-    var done = readJSON(KEY_UP, []);
+    var sent = {};
+    readJSON(KEY_UP, []).forEach(function (id) { sent[id.slice(id.lastIndexOf('_') + 1)] = true; });
     return Repo.getSessions().filter(function (s) {
-      return s.at >= since && done.indexOf(uid + '_' + s.at) < 0;
+      return s.at >= since && !sent[String(s.at)];
     });
   }
   function mark(id) {
     var done = readJSON(KEY_UP, []);
-    if (done.indexOf(id) < 0) { done.push(id); writeJSON(KEY_UP, done.slice(-500)); }
+    if (done.indexOf(id) < 0) { done.push(id); writeJSON(KEY_UP, done.slice(-3000)); }
   }
 
   function uploadOne(uid, s) {
