@@ -331,8 +331,10 @@ var App = (function () {
 
 document.addEventListener('DOMContentLoaded', function () {
   App.init();
-  /* 서비스 워커는 지금 등록하지 않는다.
-     초기 '캐시 우선' 워커 때문에 코드를 고쳐도 옛 화면이 계속 떠서,
-     sw.js를 자기 제거용으로 바꿔 두었다(이미 등록된 것만 스스로 정리된다).
-     오프라인 기능을 다시 켤 때 sw.js와 함께 이 등록을 되살리면 된다. */
+  /* 서비스 워커는 알림용으로만 등록한다(sw.js — 캐시 없음, 모든 요청은 네트워크로).
+     안드로이드 크롬은 워커를 거쳐야만 알림을 띄울 수 있다.
+     updateViaCache 'none' — 깃허브 페이지 캐시(10분) 때문에 sw.js 갱신이 늦어지지 않게 */
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).catch(function () {});
+  }
 });

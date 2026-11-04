@@ -1,20 +1,19 @@
 /* =========================================================
-   서비스 워커 — 자기 제거용 (kill switch)
+   서비스 워커 — 알림 전용 (캐시 없음)
 
-   왜 이렇게 두었나
+   왜 다시 등록하나
    ----------------
-   초기 버전이 '캐시 우선'이라, 코드를 고쳐도 브라우저가 옛 파일을 계속 썼다.
-   더 나쁜 건 그 옛 워커가 '고쳐진 워커를 불러오는 코드'까지 가로막아서
-   자력으로 풀리지 않았다는 점이다(닭-달걀).
+   안드로이드 크롬은 페이지에서 new Notification()을 막고
+   서비스 워커의 registration.showNotification()만 허용한다.
+   그래서 알림을 띄우려면 워커가 등록돼 있어야 한다.
 
-   그래서 이 파일은 캐시를 전부 지우고 스스로 등록을 해제한 뒤
-   열려 있는 탭을 새로고침한다. 그 뒤로는 모든 요청이 네트워크로 바로 간다.
-   개발 중에는 이게 맞다 — 고치면 새로고침만으로 바로 반영된다.
+   캐시는 하지 않는다
+   ------------------
+   초기 버전이 '캐시 우선'이라 코드를 고쳐도 옛 파일이 계속 떴다(그래서 한때 자기 제거용으로 두었다).
+   이 워커는 fetch 핸들러가 없다 = 모든 요청이 네트워크로 바로 간다. 고치면 새로고침만으로 반영된다.
+   예전 워커가 남긴 캐시는 활성화할 때 지운다.
 
-   ⚠️ 오프라인(PWA) 기능을 다시 켤 때
-      1) 이 파일을 캐시 전략(네트워크 우선 권장) 버전으로 되돌리고
-      2) shared/app.js 맨 아래의 serviceWorker.register 호출을 되살린다.
-      단, 그때도 '캐시 우선'으로는 돌아가지 말 것.
+   ⚠️ 오프라인(PWA) 기능을 켤 때도 '캐시 우선'으로는 돌아가지 말 것(네트워크 우선 권장).
    ========================================================= */
 
 self.addEventListener('install', function () {
@@ -27,11 +26,21 @@ self.addEventListener('activate', function (e) {
       .then(function (keys) {
         return Promise.all(keys.map(function (k) { return caches.delete(k); }));
       })
-      .then(function () { return self.registration.unregister(); })
-      .then(function () { return self.clients.matchAll({ type: 'window' }); })
-      .then(function (clients) {
-        clients.forEach(function (c) { c.navigate(c.url); });   // 최신 코드로 다시 로드
-      })
+      .then(function () { return self.clients.claim(); })
+  );
+});
+
+/* 알림을 누르면 열려 있는 앱 창으로 가고, 없으면 새로 연다 */
+self.addEventListener('notificationclick', function (e) {
+  e.notification.close();
+  var url = new URL((e.notification.data && e.notification.data.url) || './', self.registration.scope).href;
+  e.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].url.indexOf(self.registration.scope) === 0 && 'focus' in list[i]) return list[i].focus();
+      }
+      return self.clients.openWindow(url);
+    })
   );
 });
 
