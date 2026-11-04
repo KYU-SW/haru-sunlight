@@ -54,8 +54,8 @@ python -m http.server 8762
 ### 날씨 자료 (기상청 API)
 
 - **키는 저장소 코드에 넣지 않습니다.** `config.js` 의 `KMA_SERVICE_KEY` 는 빈 값으로 둡니다.
-- **배포된 사이트:** `main` 에 올라오면 `.github/workflows/deploy-pages.yml` 이
-  저장소 비밀값(Settings → Secrets and variables → Actions)의 `KMA_SERVICE_KEY` 를 채워서 깃허브 페이지에 올립니다.
+- **배포된 사이트:** 키를 넣지 않고 항상 중계 서버(Cloudflare Worker, `worker/`)로 받습니다.
+  공개 사이트의 `config.js` 는 누구나 열어 볼 수 있어서, 키는 중계 서버의 비밀값(`wrangler secret put KMA_SERVICE_KEY`)에만 둡니다.
 - **로컬 개발:** `config.local.example.js` 를 `config.local.js` 로 복사해 서비스키를 넣습니다.
   `config.local.js` 는 `.gitignore` 에 있어 깃허브에 올라가지 않습니다.
 - 키가 없으면 `config.js` 의 중계 서버(Cloudflare Worker, `worker/`)로 받습니다.
