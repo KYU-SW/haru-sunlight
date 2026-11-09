@@ -19,6 +19,10 @@ var AdminView = (function () {
     mode: null,            // 'live' | 'demo'
     email: null,
     users: [], sessions: [],
+    log: [],               // 기록 관리 — 최근 변경 내역 (adminLog)
+    sel: null,             // 기록 관리 — 기록을 보고 있는 참가자 uid
+    edit: null,            // 기록 관리 — { id } 고치는 중 / { id: null } 새로 넣는 중
+    merge: null,           // 기록 관리 — 합칠 참가자 uid
     tab: 'summary',
     loading: false
   };
@@ -75,14 +79,19 @@ var AdminView = (function () {
 
   function fetchLive() {
     state.loading = true; render();
-    return Promise.all([db.collection('users').get(), db.collection('sessions').get()])
+    /* 변경 내역은 규칙을 새로 게시하기 전이면 못 읽는다 — 그래도 나머지는 보여 준다 */
+    var logs = db.collection('adminLog').orderBy('at', 'desc').limit(50).get()
+      .then(function (q) { return q.docs.map(function (d) { return d.data(); }); })
+      .catch(function () { return []; });
+    return Promise.all([db.collection('users').get(), db.collection('sessions').get(), logs])
       .then(function (r) {
         /* 지금 로그인한 관리자 계정의 문서는 참가자에서 뺀다 (관리자가 앱에서 동의·타이머를 눌러도 섞이지 않게) */
         var me = auth.currentUser ? auth.currentUser.uid : null;
         state.users = r[0].docs.filter(function (d) { return d.id !== me; })
           .map(function (d) { var x = d.data(); x.uid = d.id; return x; });
-        state.sessions = r[1].docs.map(function (d) { return d.data(); })
+        state.sessions = r[1].docs.map(function (d) { var x = d.data(); x._id = d.id; return x; })
           .filter(function (x) { return x.uid !== me; });
+        state.log = r[2];
         state.mode = 'live'; state.loading = false; state.error = null;
         render();
       })
@@ -116,13 +125,13 @@ var AdminView = (function () {
           '</div>' +
         '</div>' +
         '<nav class="ad-tabs" role="tablist">' +
-          tabBtn('summary', '요약') + tabBtn('records', '타이머 기록') + tabBtn('settings', '설정') +
+          tabBtn('summary', '요약') + tabBtn('records', '타이머 기록') + tabBtn('manage', '기록 관리') + tabBtn('settings', '설정') +
         '</nav>' +
       '</header>' +
       '<main class="ad-main">' +
         (state.error === 'denied' ? '<div class="ad-note">이 계정은 관리자가 아니라서 기록을 볼 수 없어요.</div>' :
           state.error ? '<div class="ad-note">' + esc(state.error) + '</div>' : '') +
-        ({ summary: summaryHtml, records: recordsHtml, settings: settingsHtml }[state.tab])(ctx) +
+        ({ summary: summaryHtml, records: recordsHtml, manage: manageHtml, settings: settingsHtml }[state.tab])(ctx) +
       '</main>';
     bindMain(ctx);
   }
@@ -167,6 +176,8 @@ var AdminView = (function () {
   function startDemo() {
     var d = AdminDemo.data();
     state.mode = 'demo'; state.users = d.users; state.sessions = d.sessions; state.error = null;
+    state.sessions.forEach(function (x) { x._id = sid(x); });
+    state.log = []; state.sel = state.edit = state.merge = null;
     render();
   }
 
@@ -216,6 +227,10 @@ var AdminView = (function () {
 
   function empty() { return '<div class="ad-empty">아직 데이터가 없어요</div>'; }
 
+  /* 계속 쓴 사람 — 첫 주에 쓰고 마지막 주에도 쓴 사람 (2주 평가면 '둘째 주에도') */
+  function retLabel(weeks) { return weeks === 2 ? '둘째 주에도 쓴 사람' : '마지막 주까지 쓴 사람'; }
+  function retCount(rec) { return rec.retained === null ? '—' : rec.retained + ' / ' + rec.n + '명'; }
+
   /* 며칠 했는지를 몇 구간으로 묶어 '구간 — 막대 — 몇 명'으로 보여 준다.
      세로 막대 히스토그램은 가로·세로 축을 읽어야 해서 알아보기 어려웠다. */
   var DAY_GROUPS = [[0, 0, '0일'], [1, 3, '1~3일'], [4, 7, '4~7일'], [8, 14, '8~14일'], [15, Infinity, '15일 이상']];
@@ -233,10 +248,10 @@ var AdminView = (function () {
   }
 
   /* 연령대 · BMI 구간별 표 — 사람 수가 적은 칸은 평균이 크게 흔들리니 숫자만 참고한다 */
-  function groupTable(list) {
+  function groupTable(list, weeks) {
     if (!list.length) return empty();
     var small = list.some(function (g) { return g.n < 5; });
-    return table(['구간', '사람', '타이머 쓴 사람', '일주일 평균(분)', '목표 다 채운 날', '2주 넘게 사용'],
+    return table(['구간', '사람', '타이머 쓴 사람', '일주일 평균(분)', '목표 다 채운 날', retLabel(weeks)],
       list.map(function (g) {
         return [esc(g.label), g.n + '명', g.withData + '명', fmt(g.weekMean), fmt(g.goalsMean) + '일', g.retained + '명'];
       })) +
@@ -279,7 +294,8 @@ var AdminView = (function () {
         sub: g === null ? '한 사람 평균 · 첫 주와 마지막 주 비교' : '한 사람 평균 · 첫 주보다 ' + pct(Math.abs(g)) + (g >= 0 ? ' 늘었어요' : ' 줄었어요'),
         ok: g === null ? null : g * 100 >= c.growth, goal: '목표: ' + c.growth + '% 이상 늘기' },
       { lab: '등록한 사람', val: '<b>' + rec.n + '</b>명', sub: '타이머를 쓴 사람 ' + rec.withData + '명 · 타이머 ' + rec.sessions + '번' },
-      { lab: '2주 넘게 쓴 사람', val: '<b>' + rec.retained + '</b> / ' + rec.n + '명', sub: '처음 쓴 날부터 2주 뒤에도 타이머를 켠 사람' },
+      { lab: retLabel(rec.weeks), val: rec.retained === null ? '—' : '<b>' + rec.retained + '</b> / ' + rec.n + '명',
+        sub: rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요' },
       { lab: '하루 목표를 다 채운 날', val: '한 사람당 <b>' + fmt(S.mean(rec.goals)) + '</b>일', sub: '비타민D 하루 목표를 100% 채운 날' },
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' },
       { lab: '하루에 채운 양', val: '평균 <b>' + fmt(rec.avgCharge, 0) + '%</b>', sub: '타이머를 쓴 날 기준 · 100%면 하루 목표만큼' }
@@ -315,26 +331,330 @@ var AdminView = (function () {
           ['하루 목표를 다 채운 날 (한 사람당)', fmt(S.mean(rec.goals)) + '일'],
           ['하루에 채운 양 (평균)', fmt(rec.avgCharge, 0) + '%'],
           ['가장 오래 안 쓴 기간 (보통)', fmt(rec.gapMedian, 0) + '일'],
-          ['2주 넘게 쓴 사람', rec.retained + ' / ' + rec.n + '명'],
+          [retLabel(rec.weeks), retCount(rec)],
           ['첫 주보다 마지막 주에 더 쬔 사람', rec.improved === null ? '—' : rec.improved + '명'],
           ['알림 켠 사람 · 일주일 평균', fmt(rec.notify.onMean) + '분 (' + rec.notify.on + '명)'],
           ['알림 끈 사람 · 일주일 평균', fmt(rec.notify.offMean) + '분 (' + rec.notify.off + '명)']
         ])) +
         card(c.stampMin + '분 이상 쬔 날이 며칠인 사람이 몇 명?', groups(rec.stamps), '예: 8~14일 줄의 숫자 = 그만큼 쬔 사람 수') +
         card('하루 목표를 다 채운 날이 며칠인 사람이 몇 명?', groups(rec.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
-        card('연령대별', groupTable(rec.byAge), '온보딩에서 입력한 나이를 10살 단위로 묶었어요') +
-        card('BMI 구간별', groupTable(rec.byBmi), '대한비만학회 기준 · 저체중 18.5 미만 · 정상 23 미만 · 비만 전단계 25 미만 · 1단계 비만 30 미만') +
+        card('연령대별', groupTable(rec.byAge, rec.weeks), '온보딩에서 입력한 나이를 10살 단위로 묶었어요') +
+        card('BMI 구간별', groupTable(rec.byBmi, rec.weeks), '대한비만학회 기준 · 저체중 18.5 미만 · 정상 23 미만 · 비만 전단계 25 미만 · 1단계 비만 30 미만') +
       '</div>' +
       card('사람별 기록', '<div class="ad-bar-r"><span class="ad-muted">이름 대신 익명 ID 앞 6자리만 보여요.</span>' +
           '<button class="ad-btn sm sub" id="ad-csv">기록 CSV 내려받기</button></div>' +
-        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 다 채운 날', '가장 오래 안 쓴 기간', '2주 넘게 사용', '알림'],
+        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 다 채운 날', '가장 오래 안 쓴 기간', retLabel(rec.weeks), '알림'],
           people.map(function (p) {
             return ['<code>' + esc(p.uid.slice(0, 6)) + '</code>', p.days + '일', fmt(p.total, 0), p.stamps, p.goals, p.gap + '일', p.retained ? '예' : '아니오', p.notify ? '켬' : '끔'];
           })));
   }
 
   /* =========================================================
-     탭 ③ 설정 (8절 — 팀이 정할 것)
+     탭 ③ 기록 관리 — 관리자가 기록을 넣고 · 고치고 · 지운다
+     쓰는 경우: 로그인 문제로 다른 ID에 기록이 쌓인 사람, 탈퇴 후 다시 가입한 사람,
+               타이머를 안 끄고 둔 기록, 앱 밖에서 따로 받은 기록.
+     원칙
+       · 모든 변경은 adminLog에 '언제 · 누가 · 무엇을 · 바꾸기 전 · 바꾼 뒤 · 이유'로 남긴다.
+         (평가 데이터라, 고친 내용을 나중에 설명할 수 있어야 한다)
+       · 이유는 꼭 적는다.
+       · 참가자 앱에 저장된 기록(기기 저장소)은 바뀌지 않는다. Firestore 기록만 바뀐다.
+       · 예시 데이터에서는 이 화면 안에서만 바뀌고 Firebase에는 쓰지 않는다.
+     ========================================================= */
+  var CLOTH = [['shortShort', '반팔 + 반바지'], ['shortLong', '반팔 + 긴바지'], ['longLong', '긴팔 + 긴바지']];
+  var ACTIONS = { add: '기록 추가', edit: '기록 수정', delete: '기록 삭제', merge: '참가자 합치기',
+                  addUser: '참가자 추가', deleteUser: '참가자 삭제' };
+
+  function sid(x) { return x._id || (x.uid + '_' + x.at); }
+  function shortId(uid) { return /^manual-/.test(uid) ? uid : uid.slice(0, 6); }
+  function hhmm(at) { var d = new Date(at); return ('0' + d.getHours()).slice(-2) + ':' + ('0' + d.getMinutes()).slice(-2); }
+  function clothLabel(k) { for (var i = 0; i < CLOTH.length; i++) if (CLOTH[i][0] === k) return CLOTH[i][1]; return k || '—'; }
+  function sessionsOf(uid) {
+    return state.sessions.filter(function (x) { return x.uid === uid; })
+      .sort(function (a, b) { return b.at - a.at; });
+  }
+  /* 참가자 명단 — users 문서 + 기록만 있는 uid */
+  function roster() {
+    var m = {};
+    state.users.forEach(function (u) { m[u.uid] = { uid: u.uid, manual: !!u.manual, n: 0, min: 0, last: null }; });
+    state.sessions.forEach(function (x) {
+      var p = m[x.uid] || (m[x.uid] = { uid: x.uid, manual: false, n: 0, min: 0, last: null });
+      p.n++; p.min += +x.minutes || 0;
+      if (!p.last || x.dateKey > p.last) p.last = x.dateKey;
+    });
+    return Object.keys(m).map(function (k) { return m[k]; })
+      .sort(function (a, b) { return b.n - a.n || (a.uid < b.uid ? -1 : 1); });
+  }
+  /* 저장할 기록의 모양 — firestore.rules의 sessions 검사와 같은 범위 */
+  function plain(x) {
+    if (!x) return null;
+    return { uid: x.uid, dateKey: x.dateKey, at: x.at, minutes: x.minutes, percent: x.percent,
+             clothing: x.clothing, limitedBy: x.limitedBy };
+  }
+  function checkSession(d) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.dateKey || '')) return '날짜를 골라 주세요';
+    if (!(d.at > 0)) return '시작 시각을 골라 주세요';
+    if (!(d.minutes >= 1 && d.minutes <= 600)) return '쬔 시간은 1~600분 사이로 적어 주세요';
+    if (!(d.percent >= 0 && d.percent <= 300)) return '채운 양은 0~300% 사이로 적어 주세요';
+    return null;
+  }
+  /* 채운 양을 모를 때 — 그 사람(없으면 전체)의 1분당 평균으로 채운다 */
+  function guessPercent(uid, minutes) {
+    function rate(list) {
+      var m = 0, p = 0;
+      list.forEach(function (x) { m += +x.minutes || 0; p += +x.percent || 0; });
+      return m > 0 ? p / m : null;
+    }
+    var r = rate(sessionsOf(uid));
+    if (r === null) r = rate(state.sessions);
+    if (r === null) r = 10;
+    return Math.max(0, Math.min(300, Math.round(r * minutes)));
+  }
+  /* 같은 사람 · 같은 시각 기록이 이미 있으면 1초씩 미룬다 (문서 ID = uid_at) */
+  function freeAt(uid, at, except) {
+    var ids = {};
+    state.sessions.forEach(function (x) { if (sid(x) !== except) ids[sid(x)] = true; });
+    while (ids[uid + '_' + at]) at += 1000;
+    return at;
+  }
+
+  /* ---------- 쓰기 — 한 번에 묶어서(batch) 쓰고, 변경 내역을 같이 남긴다 ---------- */
+  function commit(ops, entry) {
+    var me = (auth && auth.currentUser && state.mode === 'live') ? auth.currentUser.uid : 'demo';
+    entry.by = me;
+    ops.forEach(function (o) { if (o.col === 'sessions' && o.data) { o.data.editedBy = me; } });
+
+    function applyLocal() {
+      ops.forEach(function (o) {
+        var list = o.col === 'sessions' ? state.sessions : state.users;
+        var key = o.col === 'sessions' ? sid : function (u) { return u.uid; };
+        for (var i = list.length - 1; i >= 0; i--) if (key(list[i]) === o.id) list.splice(i, 1);
+        if (o.type === 'set') {
+          var x = {}; for (var k in o.data) x[k] = o.data[k];
+          if (o.col === 'sessions') { x._id = o.id; x.editedAt = Date.now(); } else { x.uid = o.id; }
+          list.push(x);
+        }
+      });
+      var e = {}; for (var k in entry) e[k] = entry[k];
+      e.at = Date.now();
+      state.log.unshift(e);
+    }
+
+    if (state.mode !== 'live') { applyLocal(); return Promise.resolve(); }
+    var b = db.batch(), FV = firebase.firestore.FieldValue;
+    ops.forEach(function (o) {
+      var ref = db.collection(o.col).doc(o.id);
+      if (o.type === 'delete') { b.delete(ref); return; }
+      var d = {}; for (var k in o.data) d[k] = o.data[k];
+      if (o.col === 'sessions') d.editedAt = FV.serverTimestamp();
+      else d.createdAt = FV.serverTimestamp();
+      b.set(ref, d);
+    });
+    var log = {}; for (var k in entry) log[k] = entry[k];
+    log.at = FV.serverTimestamp();
+    b.set(db.collection('adminLog').doc(), log);
+    return b.commit().then(applyLocal);
+  }
+  function fail(e) {
+    var c = (e && e.code) || '';
+    toast(c === 'permission-denied' ? '저장하지 못했어요 — Firestore 규칙을 새로 게시했는지 확인해 주세요' : '저장하지 못했어요 (' + (c || e) + ')');
+  }
+  function done(msg) { state.edit = null; state.merge = null; render(); toast(msg); }
+
+  /* ---------- 화면 ---------- */
+  function manageHtml() {
+    var list = roster();
+    var demoNote = state.mode === 'demo' ? '<div class="ad-note">예시 데이터예요. 여기서 바꾼 내용은 이 화면에서만 보이고 저장되지 않아요.</div>' : '';
+    return '<div class="ad-hd"><h2>기록 관리</h2><p class="ad-muted">기록을 넣고 · 고치고 · 지울 수 있어요. 바꾼 내용은 이유와 함께 아래 변경 내역에 남아요.</p></div>' +
+      demoNote +
+      card('참가자', '<div class="ad-bar-r"><span class="ad-muted">로그인이 안 되는 사람은 참가자를 새로 만들어 기록을 대신 넣을 수 있어요.</span>' +
+          '<button class="ad-btn sm sub" id="mg-add-user">참가자 추가</button></div>' +
+        (list.length ? table(['ID', '타이머 기록', '쬔 시간 합계(분)', '마지막 기록', ''],
+          list.map(function (p) {
+            return ['<code>' + esc(shortId(p.uid)) + '</code>' + (p.manual ? ' <span class="ad-chip">직접 추가</span>' : ''),
+              p.n + '번', fmt(p.min, 0), p.last || '—',
+              '<div class="ad-acts">' +
+                '<button class="ad-link" data-sel="' + esc(p.uid) + '">' + (state.sel === p.uid ? '보는 중' : '기록 보기') + '</button>' +
+                '<button class="ad-link" data-merge="' + esc(p.uid) + '">합치기</button>' +
+                '<button class="ad-link" data-deluser="' + esc(p.uid) + '">삭제</button>' +
+              '</div>'];
+          })) : empty())) +
+      (state.merge ? mergeHtml(list) : '') +
+      (state.sel ? personHtml(state.sel) : '') +
+      logHtml();
+  }
+
+  function mergeHtml(list) {
+    var from = state.merge, n = sessionsOf(from).length;
+    var opts = list.filter(function (p) { return p.uid !== from; }).map(function (p) {
+      return '<option value="' + esc(p.uid) + '">' + esc(shortId(p.uid)) + ' · 기록 ' + p.n + '번</option>';
+    }).join('');
+    return card('참가자 합치기', '<p class="ad-muted"><code>' + esc(shortId(from)) + '</code>의 기록 ' + n + '개를 아래 참가자에게 옮기고, <code>' +
+        esc(shortId(from)) + '</code>는 지워요. 다시 가입해서 ID가 둘이 된 사람을 한 사람으로 묶을 때 써요.</p>' +
+      '<div class="ad-form ad-form-in">' +
+        '<label class="ad-field"><span>옮길 참가자</span><select id="mg-to">' + opts + '</select></label>' +
+        '<label class="ad-field"><span>이유</span><input id="mg-reason" type="text" maxlength="200" placeholder="예: 탈퇴 후 다시 가입"></label>' +
+        '<p class="ad-err" id="mg-err" role="alert"></p>' +
+        '<div class="ad-form-f"><button class="ad-btn" id="mg-go"' + (opts ? '' : ' disabled') + '>합치기</button><button class="ad-link" id="mg-cancel">취소</button></div>' +
+      '</div>');
+  }
+
+  function personHtml(uid) {
+    var list = sessionsOf(uid);
+    var ed = state.edit;
+    return card('<code>' + esc(shortId(uid)) + '</code>의 기록',
+      '<div class="ad-bar-r"><span class="ad-muted">기록 ' + list.length + '개 · 날짜가 최근인 것부터</span>' +
+        '<button class="ad-btn sm sub" id="mg-add">기록 추가</button></div>' +
+      (ed ? editHtml(uid, ed.id) : '') +                     // 고치는 칸은 목록 위에 — 긴 목록 아래로 내려가지 않게
+      (list.length ? table(['날짜', '시작', '쬔 시간(분)', '채운 양', '차림', '', ''],
+        list.map(function (x) {
+          var mark = x.manual ? '<span class="ad-chip">직접 추가</span>' : x.editedAt ? '<span class="ad-chip">고침</span>' : '';
+          return [x.dateKey, hhmm(x.at), x.minutes, x.percent + '%', esc(clothLabel(x.clothing)), mark,
+            '<div class="ad-acts"><button class="ad-link" data-edit="' + esc(sid(x)) + '">고치기</button>' +
+            '<button class="ad-link" data-del="' + esc(sid(x)) + '">삭제</button></div>'];
+        })) : empty()));
+  }
+
+  function editHtml(uid, id) {
+    var x = null;
+    if (id) state.sessions.forEach(function (s) { if (sid(s) === id) x = s; });
+    var date = x ? x.dateKey : today(), time = x ? hhmm(x.at) : '12:00';
+    var opt = CLOTH.map(function (c) { return '<option value="' + c[0] + '"' + (x && x.clothing === c[0] ? ' selected' : '') + '>' + c[1] + '</option>'; }).join('');
+    return '<div class="ad-form ad-form-in">' +
+      '<h3>' + (x ? date + ' ' + time + ' 기록 고치기' : '기록 추가') + '</h3>' +
+      '<div class="ad-form-row">' +
+        '<label class="ad-field"><span>날짜</span><input id="ed-date" type="date" value="' + esc(date) + '"></label>' +
+        '<label class="ad-field"><span>시작 시각</span><input id="ed-time" type="time" value="' + esc(time) + '"></label>' +
+      '</div><div class="ad-form-row">' +
+        '<label class="ad-field"><span>쬔 시간 (분)</span><input id="ed-min" type="number" min="1" max="600" value="' + (x ? x.minutes : '') + '"></label>' +
+        '<label class="ad-field"><span>채운 양 (%)</span><input id="ed-pct" type="number" min="0" max="300" value="' + (x ? x.percent : '') + '"' +
+          (x ? '' : ' placeholder="비우면 평균으로 채워요"') + '></label>' +
+      '</div>' +
+      '<label class="ad-field"><span>차림</span><select id="ed-cloth">' + opt + '</select></label>' +
+      '<label class="ad-field"><span>이유</span><input id="ed-reason" type="text" maxlength="200" placeholder="' +
+        (x ? '예: 타이머를 안 끄고 둠' : '예: 로그인이 안 돼서 따로 받은 기록') + '"></label>' +
+      '<p class="ad-err" id="ed-err" role="alert"></p>' +
+      '<div class="ad-form-f"><button class="ad-btn" id="ed-save" data-id="' + esc(id || '') + '" data-uid="' + esc(uid) + '">저장</button>' +
+        '<button class="ad-link" id="ed-cancel">취소</button></div>' +
+    '</div>';
+  }
+
+  function logHtml() {
+    if (!state.log.length) return card('변경 내역', '<div class="ad-empty">아직 바꾼 기록이 없어요</div>');
+    return card('변경 내역', table(['언제', '무엇을', '대상', '이유'], state.log.slice(0, 50).map(function (e) {
+      var at = e.at && e.at.toDate ? e.at.toDate() : new Date(e.at);
+      var when = isNaN(at) ? '—' : (at.getMonth() + 1) + '/' + at.getDate() + ' ' + hhmm(at.getTime());
+      return [when, ACTIONS[e.action] || esc(e.action), '<code>' + esc(e.target || '') + '</code>', esc(e.reason || '')];
+    })), '최근 50건');
+  }
+
+  /* ---------- 동작 ---------- */
+  function bindManage() {
+    function each(sel, fn) { [].forEach.call(document.querySelectorAll(sel), fn); }
+    each('[data-sel]', function (b) { b.onclick = function () { state.sel = b.dataset.sel; state.edit = null; render(); }; });
+    each('[data-merge]', function (b) { b.onclick = function () { state.merge = b.dataset.merge; render(); }; });
+    each('[data-edit]', function (b) { b.onclick = function () { state.edit = { id: b.dataset.edit }; render(); }; });
+    each('[data-del]', function (b) { b.onclick = function () { delSession(b.dataset.del); }; });
+    each('[data-deluser]', function (b) { b.onclick = function () { delUser(b.dataset.deluser); }; });
+    if ($('mg-add')) $('mg-add').onclick = function () { state.edit = { id: null }; render(); };
+    if ($('ed-cancel')) $('ed-cancel').onclick = function () { state.edit = null; render(); };
+    if ($('ed-save')) {
+      $('ed-save').onclick = saveSession;
+      $('ed-save').closest('.ad-form-in').scrollIntoView({ block: 'center' });
+    }
+    if ($('mg-cancel')) $('mg-cancel').onclick = function () { state.merge = null; render(); };
+    if ($('mg-go')) $('mg-go').onclick = mergeUser;
+    $('mg-add-user').onclick = addUser;
+  }
+
+  function saveSession() {
+    var b = $('ed-save'), id = b.dataset.id || null, uid = b.dataset.uid;
+    var old = null;
+    if (id) state.sessions.forEach(function (s) { if (sid(s) === id) old = s; });
+    var date = $('ed-date').value, time = $('ed-time').value || '12:00';
+    var minutes = Math.round(+$('ed-min').value);
+    var pctRaw = $('ed-pct').value.trim();
+    var reason = $('ed-reason').value.trim();
+    var at = date ? new Date(date + 'T' + time + ':00').getTime() : NaN;
+    var d = {
+      uid: uid, dateKey: date, at: at, minutes: minutes,
+      percent: pctRaw === '' ? guessPercent(uid, minutes) : Math.round(+pctRaw),
+      clothing: $('ed-cloth').value,
+      limitedBy: old ? old.limitedBy : 'vitd'
+    };
+    if (old && old.endedBy) d.endedBy = old.endedBy;
+    if (old ? old.manual : true) d.manual = true;
+    var err = checkSession(d) || (reason ? null : '이유를 적어 주세요');
+    if (err) { $('ed-err').textContent = err; return; }
+
+    /* 시각이 바뀌면 문서 ID(uid_at)도 바뀐다 — 새로 쓰고 옛것을 지운다 */
+    if (!old || old.at !== d.at) d.at = freeAt(uid, d.at, id);
+    var nid = uid + '_' + d.at;
+    var ops = [{ type: 'set', col: 'sessions', id: nid, data: d }];
+    if (old && nid !== id) ops.push({ type: 'delete', col: 'sessions', id: id });
+    b.disabled = true;
+    commit(ops, { action: old ? 'edit' : 'add', target: nid, before: plain(old), after: plain(d), reason: reason })
+      .then(function () { done(old ? '고쳤어요' : '넣었어요'); }, function (e) { b.disabled = false; fail(e); });
+  }
+
+  function delSession(id) {
+    var old = null;
+    state.sessions.forEach(function (s) { if (sid(s) === id) old = s; });
+    if (!old) return;
+    var reason = prompt(old.dateKey + ' ' + hhmm(old.at) + ' · ' + old.minutes + '분 기록을 지울까요?\n지우는 이유를 적어 주세요');
+    if (reason === null) return;
+    if (!reason.trim()) { toast('이유를 적어야 지울 수 있어요'); return; }
+    commit([{ type: 'delete', col: 'sessions', id: id }],
+      { action: 'delete', target: id, before: plain(old), after: null, reason: reason.trim().slice(0, 200) })
+      .then(function () { done('지웠어요'); }, fail);
+  }
+
+  function addUser() {
+    var reason = prompt('새 참가자를 만들어요. 이 참가자에게는 기록을 직접 넣을 수 있어요.\n만드는 이유를 적어 주세요 (예: 로그인 오류로 앱을 못 쓰는 참가자)');
+    if (reason === null) return;
+    if (!reason.trim()) { toast('이유를 적어야 만들 수 있어요'); return; }
+    var uid = 'manual-' + Math.random().toString(36).slice(2, 10);
+    var by = (auth && auth.currentUser && state.mode === 'live') ? auth.currentUser.uid : 'demo';
+    commit([{ type: 'set', col: 'users', id: uid, data: { manual: true, editedBy: by } }],
+      { action: 'addUser', target: uid, before: null, after: { uid: uid }, reason: reason.trim().slice(0, 200) })
+      .then(function () { state.sel = uid; state.edit = { id: null }; render(); toast('참가자를 만들었어요 — 기록을 넣어 주세요'); }, fail);
+  }
+
+  function delUser(uid) {
+    var list = sessionsOf(uid);
+    var reason = prompt('참가자 ' + shortId(uid) + '와 기록 ' + list.length + '개를 모두 지울까요?\n지운 기록은 되돌릴 수 없어요. 지우는 이유를 적어 주세요');
+    if (reason === null) return;
+    if (!reason.trim()) { toast('이유를 적어야 지울 수 있어요'); return; }
+    var ops = list.map(function (x) { return { type: 'delete', col: 'sessions', id: sid(x) }; });
+    ops.push({ type: 'delete', col: 'users', id: uid });
+    commit(ops, { action: 'deleteUser', target: uid, before: { uid: uid, sessions: list.length }, after: null, reason: reason.trim().slice(0, 200) })
+      .then(function () { if (state.sel === uid) state.sel = null; done('지웠어요'); }, fail);
+  }
+
+  function mergeUser() {
+    var from = state.merge, to = $('mg-to').value, reason = $('mg-reason').value.trim();
+    if (!to) return;
+    if (!reason) { $('mg-err').textContent = '이유를 적어 주세요'; return; }
+    var list = sessionsOf(from), ops = [], taken = {};
+    state.sessions.forEach(function (x) { if (x.uid === to) taken[x.at] = true; });
+    list.forEach(function (x) {
+      var at = x.at;
+      while (taken[at]) at += 1000;
+      taken[at] = true;
+      var d = plain(x); d.uid = to; d.at = at;
+      if (x.endedBy) d.endedBy = x.endedBy;
+      if (x.manual) d.manual = true;
+      ops.push({ type: 'set', col: 'sessions', id: to + '_' + at, data: d });
+      ops.push({ type: 'delete', col: 'sessions', id: sid(x) });
+    });
+    ops.push({ type: 'delete', col: 'users', id: from });
+    if (ops.length > 490) { $('mg-err').textContent = '기록이 너무 많아 한 번에 옮길 수 없어요'; return; }
+    $('mg-go').disabled = true;
+    commit(ops, { action: 'merge', target: from, before: { uid: from, sessions: list.length }, after: { uid: to }, reason: reason.slice(0, 200) })
+      .then(function () { state.sel = to; done('합쳤어요'); }, function (e) { $('mg-go').disabled = false; fail(e); });
+  }
+
+  /* =========================================================
+     탭 ④ 설정 (8절 — 팀이 정할 것)
      ========================================================= */
   function settingsHtml(x) {
     var c = x.c;
@@ -363,6 +683,7 @@ var AdminView = (function () {
     $('ad-out').onclick = function () {
       var done = function () {
         state.mode = null; state.users = []; state.sessions = []; state.error = null;
+        state.log = []; state.sel = state.edit = state.merge = null;
         render();
       };
       /* 실제 기록을 보던 중이면 로그아웃하고 앱 첫 화면으로 — 앱은 다시 게스트로 시작한다 */
@@ -371,6 +692,7 @@ var AdminView = (function () {
     };
     if ($('ad-reload')) $('ad-reload').onclick = fetchLive;
     if ($('ad-csv')) $('ad-csv').onclick = exportCsv;
+    if (state.tab === 'manage') bindManage();
 
     if ($('cf-save')) {
       $('cf-save').onclick = function () {
@@ -404,8 +726,9 @@ var AdminView = (function () {
   /* 기록 CSV — 발표 자료·통계 프로그램용. 이름·이메일은 원래 없다. */
   function exportCsv() {
     var head = ['uid', 'dateKey', 'at', 'minutes', 'percent', 'clothing', 'limitedBy', 'endedBy'];
-    var lines = [head.join(',')].concat(state.sessions.map(function (s) {
-      return head.map(function (k) { return csvCell(s[k]); }).join(',');
+    /* 관리자가 넣거나 고친 기록은 표시해 둔다 (자세한 내용은 기록 관리 › 변경 내역) */
+    var lines = [head.concat(['manual', 'edited']).join(',')].concat(state.sessions.map(function (s) {
+      return head.map(function (k) { return csvCell(s[k]); }).concat([s.manual ? 1 : 0, s.editedAt ? 1 : 0]).join(',');
     }));
     var blob = new Blob(['﻿' + lines.join('\n')], { type: 'text/csv;charset=utf-8' });
     var a = document.createElement('a');
@@ -416,7 +739,7 @@ var AdminView = (function () {
 
   function start() {
     var h = (location.hash || '').slice(1);
-    if (['summary', 'records', 'settings'].indexOf(h) >= 0) state.tab = h;
+    if (['summary', 'records', 'manage', 'settings'].indexOf(h) >= 0) state.tab = h;
     if (initFirebase()) {
       /* 이미 관리자로 로그인해 있으면 바로 불러온다 */
       var first = true;
