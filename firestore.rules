@@ -44,29 +44,63 @@ service cloud.firestore {
         && (!('appVersion' in request.resource.data)
             || request.resource.data.appVersion.matches('^v_[0-9]{1,3}[.][0-9]{1,3}$'));
       allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
-      allow delete: if false;
+      // 관리자 — 로그인이 안 되는 참가자를 직접 만든다(manual-…), 합치기 · 삭제 때 지운다
+      allow create: if isAdmin()
+        && uid.matches('^manual-[a-z0-9]{4,20}$')
+        && request.resource.data.keys().hasOnly(['createdAt','manual','editedBy'])
+        && request.resource.data.manual == true
+        && request.resource.data.editedBy == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    // 타이머 기록 한 건의 값 검사 — 참가자 업로드와 관리자 수정이 같이 쓴다
+    function validSession(d, docId) {
+      return d.minutes is int
+        && d.minutes >= 1 && d.minutes <= 600
+        && d.percent is int
+        && d.percent >= 0 && d.percent <= 300
+        && d.clothing in ['shortShort','shortLong','longLong']
+        && d.limitedBy in ['vitd','burn','heat']
+        // 문서 ID는 {uid}_{at} 형식만 — 같은 기록을 ID만 바꿔 여러 번 올리지 못하게
+        && d.at is int
+        && docId == d.uid + '_' + string(d.at)
+        && d.dateKey is string
+        && d.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+        && (!('endedBy' in d) || (d.endedBy is string && d.endedBy.matches('^[a-z]{1,12}$')));
     }
 
     match /sessions/{docId} {
+      // 참가자 — 자기 기록을 한 번 올리면 끝. 고치거나 지우지 못한다
       allow create: if signedIn()
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.keys().hasOnly(
              ['uid','dateKey','at','minutes','percent','clothing','limitedBy','endedBy','uploadedAt'])
-        && request.resource.data.minutes is int
-        && request.resource.data.minutes >= 1 && request.resource.data.minutes <= 600
-        && request.resource.data.percent is int
-        && request.resource.data.percent >= 0 && request.resource.data.percent <= 300
-        && request.resource.data.clothing in ['shortShort','shortLong','longLong']
-        && request.resource.data.limitedBy in ['vitd','burn','heat']
-        // 문서 ID는 앱이 만드는 {uid}_{at} 형식만 — 같은 기록을 ID만 바꿔 여러 번 올리지 못하게
-        && request.resource.data.at is int
-        && docId == request.auth.uid + '_' + string(request.resource.data.at)
-        && request.resource.data.dateKey is string
-        && request.resource.data.dateKey.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-        && (!('endedBy' in request.resource.data)
-            || (request.resource.data.endedBy is string && request.resource.data.endedBy.matches('^[a-z]{1,12}$')));
+        && validSession(request.resource.data, docId);
+      // 관리자 — 기록을 넣고 · 고치고 · 지운다. 바꾼 내용은 adminLog에 따로 남긴다(관리자 화면이 같이 쓴다)
+      allow create, update: if isAdmin()
+        && request.resource.data.keys().hasOnly(
+             ['uid','dateKey','at','minutes','percent','clothing','limitedBy','endedBy','uploadedAt',
+              'manual','editedAt','editedBy'])
+        && request.resource.data.uid is string && request.resource.data.uid.size() <= 128
+        && request.resource.data.editedBy == request.auth.uid
+        && (!('manual' in request.resource.data) || request.resource.data.manual is bool)
+        && validSession(request.resource.data, docId)
+        && (resource == null || (resource.data.uid == request.resource.data.uid && resource.data.at == request.resource.data.at));
+      allow delete: if isAdmin();
       allow read: if isAdmin() || (signedIn() && resource.data.uid == request.auth.uid);
-      allow update, delete: if false;   // 한 번 쓴 기록은 고치거나 지우지 못한다
+    }
+
+    // 관리자 변경 내역 — 쓰기만 하고 고치거나 지우지 못한다
+    match /adminLog/{id} {
+      allow read: if isAdmin();
+      allow create: if isAdmin()
+        && request.resource.data.keys().hasOnly(['at','by','action','target','before','after','reason'])
+        && request.resource.data.by == request.auth.uid
+        && request.resource.data.action in ['add','edit','delete','merge','addUser','deleteUser']
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 1 && request.resource.data.reason.size() <= 200
+        && request.resource.data.target is string && request.resource.data.target.size() <= 160;
+      allow update, delete: if false;
     }
 
     // 그 외는 전부 막음

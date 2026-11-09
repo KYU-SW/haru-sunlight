@@ -97,8 +97,9 @@ var AdminStats = (function () {
       for (var d = start; d !== null && d <= lastCounted; d++) {
         if (days[d] && inPeriod(d)) { run = 0; } else { run++; if (run > gap) gap = run; }
       }
-      var all = Object.keys(days).map(Number).sort(function (a, b) { return a - b; });
-      var retained = all.length > 0 && all[all.length - 1] >= all[0] + 14;   // 첫 기록 후 14일째 이후에도 기록
+      /* 계속 쓴 사람 = 첫 주에 쓰고 마지막 주에도 쓴 사람. 기간이 1주면 셀 수 없다.
+         (예전 '첫 기록 후 14일째 이후' 기준은 2주 평가에서 늘 0명이 나왔다) */
+      var retained = weeks > 1 && week[0] > 0 && week[weeks - 1] > 0;
       return {
         uid: uid, notify: !!(roster[uid] && roster[uid].notify),
         sido: roster[uid] && roster[uid].sido, skinType: roster[uid] && roster[uid].skinType,
@@ -152,7 +153,7 @@ var AdminStats = (function () {
       avgCharge: mean(dayPcts),
       gapMedian: median(people.map(function (p) { return p.gap; }).concat(
         (function () { var a = [], len = start !== null ? lastCounted - start + 1 : 0; for (var i = 0; i < zeros; i++) a.push(len); return a; })())),
-      retained: people.filter(function (p) { return p.retained; }).length,
+      retained: weeks > 1 ? people.filter(function (p) { return p.retained; }).length : null,
       improved: improved,
       notify: { on: on.length, off: off.length, onMean: perWeek(on), offMean: perWeek(off) },   // 가입 기록이 없는 참가자는 알림 설정을 알 수 없어 뺀다
       limited: limited, ended: ended,
