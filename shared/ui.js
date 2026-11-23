@@ -80,9 +80,40 @@ var UI = (function () {
   }
   function closeSheet() { document.getElementById('sheet-bg').classList.remove('show'); }
 
+  /* 피부 타입 풀이 — 온보딩 · 마이페이지 피부 타입 고르는 곳 아래에 둔다.
+     시트 위에 시트를 또 띄우지 않도록 그 자리에서 펼친다 (누르면 열고 · 다시 누르면 닫음) */
+  var SKIN_GUIDE = [
+    ['Ⅰ', '아주 흰 피부 · 주근깨', '항상 빨개지고, 까매지지는 않아요'],
+    ['Ⅱ', '흰 피부', '쉽게 빨개지고, 조금 까매져요'],
+    ['Ⅲ', '밝은 갈색', '가끔 빨개지고, 천천히 까매져요 · 한국인에게 가장 흔해요'],
+    ['Ⅳ', '중간 갈색', '거의 안 빨개지고, 잘 까매져요'],
+    ['Ⅴ', '진한 갈색', '드물게 빨개지고, 진하게 까매져요'],
+    ['Ⅵ', '아주 진한 갈색 · 검은 피부', '안 빨개지고, 늘 짙은 피부예요']
+  ];
+  function skinGuide() {
+    return '<button type="button" class="sg-link" data-sg>피부 타입이 뭐예요?' + ICON.right + '</button>' +
+      '<div class="sg-box" hidden>' +
+        '<div class="sg-p">햇빛을 받았을 때 피부가 얼마나 <b>빨개지는지</b>(그날 붉어지고 따가움 · 흔히 "탄다"), ' +
+          '얼마나 <b>까매지는지</b>(며칠 뒤 갈색으로 변함 · 흔히 "그을린다")로 나눈 6단계예요. ' +
+          '피부과에서 쓰는 기준(피츠패트릭 분류)이에요.</div>' +
+        '<div class="sg-list">' + SKIN_GUIDE.map(function (r) {
+          return '<div class="sg-r"><em>' + r[0] + '</em><div><b>' + r[1] + '</b><span>' + r[2] + '</span></div></div>';
+        }).join('') + '</div>' +
+        '<div class="sg-p">숫자가 클수록 잘 안 빨개지는 대신, 비타민D를 만드는 데 시간이 더 걸려요. ' +
+          '한국인은 대부분 Ⅲ~Ⅳ예요. 잘 모르겠으면 <b>Ⅲ</b>으로 두세요.</div>' +
+      '</div>';
+  }
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-sg]');
+    if (!b) return;
+    var box = b.nextElementSibling, open = box.hasAttribute('hidden');
+    if (open) box.removeAttribute('hidden'); else box.setAttribute('hidden', '');
+    b.classList.toggle('on', open);
+  });
+
   return {
     p2: p2, hm: hm, hmk: hmk, dateKo: dateKo, timeToMin: timeToMin,
     nowMin: nowMin, esc: esc, mins: mins,
-    ICON: ICON, toast: toast, sheet: sheet, closeSheet: closeSheet
+    ICON: ICON, toast: toast, sheet: sheet, closeSheet: closeSheet, skinGuide: skinGuide
   };
 })();

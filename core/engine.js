@@ -374,7 +374,16 @@ var Engine = (function () {
 
   function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
+  /* 기온별 옷차림 — 우리나라에서 흔히 쓰는 '기온별 옷차림' 구간을 세 단계로 줄였다
+       낮 최고 23℃ 이상 반팔 + 반바지 · 20~22℃ 반팔 + 긴바지 · 20℃ 미만 긴팔 + 긴바지
+     계산 근거가 아니라 편의 기능 — 사용자가 마이페이지에서 켤 때만 쓴다 */
+  function clothingForTemp(t) {
+    if (t == null || !isFinite(t)) return null;
+    return t >= 23 ? 'shortShort' : t >= 20 ? 'shortLong' : 'longLong';
+  }
+
   return {
+    clothingForTemp: clothingForTemp,
     K_VITD: K_VITD, vitdRatio: vitdRatio, MIN_UVI: MIN_UVI, UVI_COEFF: UVI_COEFF, MED: MED, CLOTHING: CLOTHING,
     PLACES: PLACES, bmi: bmi,
     personal: personal, habitMinute: habitMinute,

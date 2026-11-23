@@ -343,6 +343,9 @@ ok('57일째에는 코스 끝 · 8주', cEnd.finished === true && cEnd.week === 
 ok('코스는 56일(8주)', Course.DAYS === 56 && cEnd.cells.length === 56 && cEnd.cells[55].key === '2026-12-26');
 ok('끝나면 첫 2주 vs 마지막 2주 비교', cEnd.first.counted === 14 && cEnd.first.done === 3 && cEnd.last.percent === 0);
 ok('시작 안 했으면 started = false', Course.model(null, {}, '2026-11-06').started === false);
+ok('기온별 옷차림 — 23℃↑ 반팔반바지 · 20~22℃ 반팔긴바지 · 20℃ 미만 긴팔긴바지',
+   Engine.clothingForTemp(23) === 'shortShort' && Engine.clothingForTemp(22) === 'shortLong' &&
+   Engine.clothingForTemp(20) === 'shortLong' && Engine.clothingForTemp(19.9) === 'longLong' && Engine.clothingForTemp(null) === null);
 ok('type 없는 예전 기록은 8주 매일 코스', Course.typeOf({ start: cStart }).id === 'daily8' && cm.type.id === 'daily8');
 
 /* 12주 채우고 유지 — 처음 4주 주 3번, 다음 8주 주 1번 */

@@ -19,6 +19,8 @@ var Repo = (function () {
     useCircadian: true,
     supplement: false,    // §5 합산 상한 경고용
     notify: false,
+    autoCloth: false,     // 켜면 그날 낮 최고 기온으로 옷차림을 하루 한 번 맞춘다 (Engine.clothingForTemp)
+    autoClothDay: null,   // 마지막으로 맞춘 날 — 같은 날 직접 바꾼 옷차림은 덮어쓰지 않는다
     consent: null         // 기록 수집 동의 {agreed, version, at} — 답하기 전엔 null
   };
 

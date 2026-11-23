@@ -71,6 +71,24 @@ var App = (function () {
     boot();
   }
 
+  /* 기온에 맞춰 옷차림 자동 (마이페이지 켜기/끄기) — 하루 한 번, 오늘 낮(9~18시) 최고 기온으로 정한다.
+     같은 날 사용자가 직접 바꾼 옷차림은 덮어쓰지 않는다. 바꿨으면 {clothing, temp}를 돌려준다 */
+  function applyAutoCloth() {
+    var p = Repo.getProfile();
+    if (!p.autoCloth || !state.weather || !state.weather.days || !state.weather.days.length) return null;
+    var day = Engine.dayKey(new Date());
+    if (p.autoClothDay === day) return null;
+    var today = state.weather.days.filter(function (d) { return d.date === day; })[0] || state.weather.days[0];
+    var temps = (today.hourly || []).filter(function (h) { return h.minuteOfDay >= 540 && h.minuteOfDay <= 1080 && typeof h.tempC === 'number'; })
+      .map(function (h) { return h.tempC; });
+    if (!temps.length) return null;
+    var t = Math.round(Math.max.apply(null, temps));
+    var c = Engine.clothingForTemp(t);
+    Repo.setProfile({ clothing: c, autoClothDay: day });
+    invalidate();
+    return { clothing: c, temp: t };
+  }
+
   function boot() {
     state.profile = Repo.getProfile();
     state.location = Repo.getLocation();
@@ -85,6 +103,7 @@ var App = (function () {
         state.stale = res.stale;
         state.loading = false;
         invalidate();
+        applyAutoCloth();
         resumeTimer();
         if (state.profile.notify) Notify.schedule(prescription());
         go(state.tab);
@@ -118,6 +137,7 @@ var App = (function () {
       state.weather = res.data;
       state.stale = res.stale;
       invalidate();
+      applyAutoCloth();
       if (state.profile.notify) Notify.schedule(prescription());
       refreshView();
       return res;
@@ -326,7 +346,7 @@ var App = (function () {
   return {
     init: init, boot: boot, go: go, refresh: refresh,
     refreshView: refreshView, invalidate: invalidate,
-    prescription: prescription, startTimer: startTimer, enableNotify: enableNotify,
+    prescription: prescription, startTimer: startTimer, enableNotify: enableNotify, applyAutoCloth: applyAutoCloth,
     get state() { return state; }
   };
 })();

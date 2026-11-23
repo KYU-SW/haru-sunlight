@@ -5,7 +5,7 @@
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 [![Deploy Pages](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml)
 
-`v_2.2` · 회복 코스 탭 (8주 · 12주) · 통합 테스트 · 자동 테스트
+`v_2.3` · 회복 코스 탭 (8주 · 12주) · 피부 타입 풀이 · 기온별 옷차림 자동
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html  
@@ -272,3 +272,4 @@ tests/                테스트 · 모의 데이터 화면 (smoke · integration
 | `v_2.0` | **회복 코스 탭** — 하단 탭을 홈 · 회복 코스 · 마이페이지로. 코스 2개(8주 매일 · 12주 채우고 유지)를 카드로 고르고, 코스별 소개 애니메이션에서 왜 그 기간인지 설명. 날씨에 맞춘 할 일(처방 채우기 · 겨울엔 낮 빛 20~30분 · 비 · 폭염은 쉬는 날), 홈 카드, 기록 · 달성률 · 첫 2주 vs 마지막 2주, 근거 보기 시트. 근거: Joh 2020 · Lee 2020(국내 RCT 2편) · Carswell 2018 · Singh 2024 · Brown 2022 |
 | `v_2.1` | 관리자 대시보드 '현장에서 모은 기록' — Firestore `offline`(현장 참가자별 요약 · 익명 ID)을 읽어 요약 · 타이머 기록에 함께 계산(지연 시간 · 예외 카드 추가, '하루에 채운 양' 칸 → 앱 · 현장 기록을 합친 '하루 목표를 채운 비율'), 설정 탭에서 익명화한 파일 올리기 · 지우기(변경 내역에 남김). **Firestore 규칙 다시 게시 필요** |
 | `v_2.2` | **교수 피드백 반영** — README에 대상 사용자 · 기존 앱 한계 · 기능 비교표 · 기대 효과 측정 지표 · 데이터 흐름 그림(Mermaid) · 오류 처리 표 · 팀 기여 · 화면 캡처(`docs/images/`), 통합 테스트(`tests/integration.html`, 시나리오 10개 · 42항목), 실제 기상청 연결 확인(`tests/live.html`), 자동 테스트 워크플로(`test.yml`), [`TESTING.md`](TESTING.md) |
+| `v_2.3` | 피부 타입 말 바꾸기("타다 · 그을리다" → "빨개지다 · 까매지다", 온보딩에 두 말 뜻 표시), 피부 타입 풀이(온보딩 · 마이페이지 "피부 타입이 뭐예요?" — 6단계 쉬운 설명, 펼쳐 보기), 마이페이지 **기온에 맞춰 옷차림 자동** 켜기/끄기(오늘 낮 9~18시 최고 기온 23℃↑ 반팔+반바지 · 20~22℃ 반팔+긴바지 · 20℃ 미만 긴팔+긴바지, 하루 한 번 · 같은 날 직접 바꾼 건 유지) |

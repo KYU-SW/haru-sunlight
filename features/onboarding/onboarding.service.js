@@ -6,12 +6,12 @@ var OnboardingService = (function () {
 
   /* §7 질문 1 — 피부 타입 (마이페이지와 같은 6단계 · 피츠패트릭 Ⅰ~Ⅵ) */
   var SKIN_OPTIONS = [
-    { type: 1, label: 'Ⅰ', title: '항상 타고 절대 안 그을림',   desc: '타입 Ⅰ' },
-    { type: 2, label: 'Ⅱ', title: '쉽게 타고 조금 그을림',      desc: '타입 Ⅱ' },
-    { type: 3, label: 'Ⅲ', title: '가끔 타고 서서히 그을림',    desc: '타입 Ⅲ' },
-    { type: 4, label: 'Ⅳ', title: '거의 안 타고 잘 그을림',     desc: '타입 Ⅳ' },
-    { type: 5, label: 'Ⅴ', title: '드물게 타고 진하게 그을림',  desc: '타입 Ⅴ' },
-    { type: 6, label: 'Ⅵ', title: '타지 않음',                  desc: '타입 Ⅵ' }
+    { type: 1, label: 'Ⅰ', title: '항상 빨개지고, 까매지지는 않아요',   desc: '타입 Ⅰ' },
+    { type: 2, label: 'Ⅱ', title: '쉽게 빨개지고, 조금 까매져요',      desc: '타입 Ⅱ' },
+    { type: 3, label: 'Ⅲ', title: '가끔 빨개지고, 천천히 까매져요',    desc: '타입 Ⅲ' },
+    { type: 4, label: 'Ⅳ', title: '거의 안 빨개지고, 잘 까매져요',     desc: '타입 Ⅳ' },
+    { type: 5, label: 'Ⅴ', title: '드물게 빨개지고, 진하게 까매져요',  desc: '타입 Ⅴ' },
+    { type: 6, label: 'Ⅵ', title: '안 빨개지고, 늘 짙은 피부예요',                  desc: '타입 Ⅵ' }
   ];
   var UNSURE_INDEX = 2;   // '잘 모르겠어요' → 타입 Ⅲ 기본값
 

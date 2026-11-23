@@ -1857,3 +1857,23 @@ body:has(#login.show) #toast, body:has(#onboarding.show) #toast { bottom:calc(18
 .cs-d.free { background:#fff; border:1px solid var(--hair); }
 .cs-cmp-c { width:104px; }
 .cs-cmp-c b { font-size:17px; white-space:nowrap; letter-spacing:-0.03em; }
+
+/* 피부 타입 풀이 (UI.skinGuide) */
+.sg-link { display:inline-flex; align-items:center; gap:2px; margin-top:10px; font-size:13.5px; font-weight:700; color:#326CF9; }
+.sg-link svg { width:15px; height:15px; transition:transform .2s; }
+.sg-link.on svg { transform:rotate(90deg); }
+.sg-box { margin-top:10px; padding:14px 16px; border-radius:16px; background:#F3F6FB; }
+.sheet .sg-box { background:#FFF; }
+.sg-p { font-size:13px; font-weight:500; line-height:1.6; color:var(--ink-2); }
+.sg-p b { color:var(--ink); font-weight:700; }
+.sg-list { display:flex; flex-direction:column; gap:8px; margin:12px 0; }
+.sg-r { display:flex; gap:10px; align-items:flex-start; }
+.sg-r em { flex:none; width:26px; height:26px; border-radius:50%; background:#EAF0FF; color:#326CF9; font-style:normal;
+  font-size:12.5px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+.sg-r b { display:block; font-size:13.5px; font-weight:700; color:var(--ink); }
+.sg-r span { display:block; font-size:12.5px; font-weight:500; color:var(--ink-3); line-height:1.5; }
+@media (prefers-reduced-motion: reduce) { .sg-link svg { transition:none; } }
+
+/* 온보딩 피부 타입 — 빨개짐 · 까매짐 뜻 */
+.ob-words { display:flex; flex-wrap:wrap; gap:6px 12px; margin-top:10px; font-size:12.5px; font-weight:500; color:var(--ink-3); }
+.ob-words b { color:#326CF9; font-weight:800; margin-right:4px; }

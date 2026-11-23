@@ -55,6 +55,8 @@ var OnboardingView = (function () {
       '<div class="ob-step">1 / ' + S.total() + '</div>' +
       '<div class="ob-q">여름에 팔뚝을<br>30분 쬐면 어떻게 되나요?</div>' +
       '<div class="ob-help">피부 타입에 따라 필요한 시간이 5배까지 차이 나요.</div>' +
+      '<div class="ob-words"><span><b>빨개짐</b> 그날 붉어지고 따가움</span><span><b>까매짐</b> 며칠 뒤 갈색으로 변함</span></div>' +
+      UI.skinGuide() +
       '<div class="ob-opts">' +
         S.SKIN_OPTIONS.map(function (o, i) {
           return '<button class="ob-opt' + (S.state.skinIndex === i ? ' on' : '') + '" data-i="' + i + '">' +

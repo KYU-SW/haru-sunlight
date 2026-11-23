@@ -27,7 +27,8 @@ var SettingsView = (function () {
         group('내 정보',
           navRow('s-body-skin', '피부 타입', '타입 ' + skin) +
           navRow('s-body-size', '나이 · 키 · 몸무게', sizeText(p)) +
-          navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '')) +
+          navRow('s-body-cloth', '기본 옷차림', cloth ? cloth.label : '') +
+          toggleRow('s-autocloth', '기온에 맞춰 옷차림 자동', !!p.autoCloth)) +
 
         group('알림',
           toggleRow('s-notify', '햇빛 알림', p.notify && m.notifyGranted)) +
@@ -155,6 +156,7 @@ var SettingsView = (function () {
         '</div>' +
         '<div class="st-sh-d">' +
           m.skinOptions.filter(function (s) { return s.t === p.skinType; })[0].desc + '</div>' +
+        UI.skinGuide() +
       '</div>' +
 
       '<div class="st-sh">' +
@@ -276,6 +278,15 @@ var SettingsView = (function () {
         UI.toast('로그아웃했어요 · 게스트로 계속 써요');
         render();
       });
+    };
+
+    q('s-autocloth').onclick = function () {
+      var on = !Repo.getProfile().autoCloth;
+      Repo.setProfile({ autoCloth: on, autoClothDay: null });
+      var c = on ? App.applyAutoCloth() : null;
+      UI.toast(on ? (c ? '오늘 낮 최고 ' + c.temp + '℃ — ' + Engine.CLOTHING[c.clothing].label + '로 맞췄어요' : '날마다 그날 기온에 맞춰 바꿔 드릴게요')
+                  : '이제 고른 옷차림을 그대로 써요');
+      after();
     };
 
     q('s-notify').onclick = function () {
