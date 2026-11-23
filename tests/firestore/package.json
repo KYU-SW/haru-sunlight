@@ -1,14 +1,15 @@
 {
   "name": "haru-sunlight-firestore-rules-test",
   "private": true,
-  "description": "firestore.rules 를 Firebase 에뮬레이터(실제 Firestore 엔진)로 검사한다 — 실제 서버는 건드리지 않는다",
+  "description": "firestore.rules 와 지난주 평균 자동 계산(scripts/weekly-stats)을 Firebase 에뮬레이터(실제 Firestore 엔진)로 검사한다 — 실제 서버는 건드리지 않는다",
   "type": "module",
   "scripts": {
-    "test": "firebase emulators:exec --only firestore --project demo-haru-sunlight \"node --test rules.test.mjs\""
+    "test": "firebase emulators:exec --only firestore --project demo-haru-sunlight \"node --test --test-concurrency=1 rules.test.mjs weekly.test.mjs\""
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "6.0.0",
     "firebase": "13.4.0",
-    "firebase-tools": "15.37.0"
+    "firebase-tools": "15.37.0",
+    "firebase-admin": "14.5.0"
   }
 }

@@ -145,7 +145,7 @@ flowchart TD
 | `users` | Auth uid | `consentedAt` · `consentVersion` · `skinType`(1\~6) · `sido`(시 · 도 이름) · `ageGroup`(10\~70) · `bmiGroup`(5구간) · `notify` · `appVersion` · `createdAt` · `updatedAt` | 본인만 | 본인 · 관리자 |
 | `sessions` | `{uid}_{시작 시각}` | `uid` · `dateKey` · `at` · `minutes`(1\~600) · `percent`(0\~300) · `clothing`(3종) · `limitedBy`(vitd · burn · heat) · `uploadedAt` | 본인은 **한 번 만들기만** (수정 · 삭제 불가), 관리자는 수정 시 `adminLog`에 남김 | 본인 · 관리자 |
 | `adminLog` | 자동 | `at` · `by` · `action` · `target` · `before` · `after` · `reason`(1\~200자) | 관리자 (**고치거나 지울 수 없음**) | 관리자 |
-| `stats` | `latest` 하나 | 지난주 평균 (타이머 끝난 뒤 '지난주 돌아보기'에서 비교) — `week`(월요일) · `n`(인원) · `goalRate`(목표 채운 비율 평균) · `minutes` · `updatedAt` · `by` | 관리자 (대시보드를 열 때 갱신) | 로그인한 사람 |
+| `stats` | `latest` 하나 | 지난주 평균 (타이머 끝난 뒤 '지난주 돌아보기'에서 비교) — `week`(월요일) · `n`(인원) · `goalRate`(목표 채운 비율 평균) · `minutes` · `updatedAt` · `by` | GitHub Actions가 매주 월요일 01:00 자동 갱신 (관리자 대시보드를 열 때도) | 로그인한 사람 |
 | `surveys` | `{uid}_{주 월요일}` | 햇빛을 못 쬔 가장 큰 이유 — `uid` · `week` · `answer`(time · forgot · weather · burn · lazy · none) · `at` · `appVersion` | 본인만 **한 주에 한 번** (수정 · 삭제 불가) | 본인 · 관리자 |
 | `offline` | 익명 ID (영문 소문자 · 숫자 4\~12자) | 현장 참가자 요약 — `records` · `setRate` · `goalDone` · `goalTotal` · `before` · `after` · `exceptions` | 관리자 | 관리자 |
 
@@ -217,6 +217,18 @@ python -m http.server 8762
 ```
 
 로컬에서 실제 예보를 받으려면 아래 '날씨 자료'대로 `config.local.js`에 키를 넣습니다. 키가 없으면 중계 서버로 받습니다.
+
+### 지난주 평균 자동 계산 (GitHub Actions)
+
+앱의 '지난주 돌아보기' 팝업에 나오는 **다른 사람들 평균**은 [`weekly-stats.yml`](.github/workflows/weekly-stats.yml)이 매주 월요일 01:00(한국 시간)에
+Firestore의 지난주 기록으로 계산해 `stats/latest`에 숫자 셋(인원 · 하루 목표 채운 비율 평균 · 쬔 시간 평균)만 씁니다.
+계산은 앱과 같은 `core/report.js`를 그대로 불러 쓰고, 관리자 계정의 기록은 뺍니다 (`scripts/weekly-stats/`, 에뮬레이터 테스트 `tests/firestore/weekly.test.mjs`).
+
+**처음 한 번만 설정** — Firebase 콘솔 권한이 있는 사람이 합니다.
+1. Firebase 콘솔 › ⚙ 프로젝트 설정 › **서비스 계정** › **새 비공개 키 생성** → JSON 파일을 받습니다.
+2. GitHub 저장소 › Settings › Secrets and variables › Actions › **New repository secret** — 이름 `FIREBASE_SERVICE_ACCOUNT`, 값은 JSON 파일 내용 전체.
+3. Actions › **Weekly stats** › **Run workflow** 로 한 번 돌려 확인합니다 (Summary에 "stats/latest 갱신 — …").
+4. 받은 JSON 파일은 지웁니다. **저장소에 올리면 안 됩니다** (비밀값이 없으면 워크플로는 경고만 남기고 끝납니다).
 
 ### 날씨 자료 (기상청 API)
 

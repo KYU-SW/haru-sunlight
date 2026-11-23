@@ -1,0 +1,35 @@
+# 지난주 평균 자동 계산 — 매주 월요일 01:00(한국 시간)에 stats/latest 를 갱신한다.
+# 앱의 '지난주 돌아보기' 팝업이 이 숫자로 "다른 사람들은 평균 55% 채웠는데, 나는 67%"를 보여 준다.
+# 저장소 비밀값 FIREBASE_SERVICE_ACCOUNT(Firebase 서비스 계정 JSON)가 있어야 동작한다 — 없으면 경고만 남기고 끝난다.
+name: Weekly stats
+
+on:
+  schedule:
+    - cron: '0 16 * * 0'      # UTC 일요일 16:00 = 한국 시간 월요일 01:00
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  stats:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Seoul
+    defaults:
+      run:
+        working-directory: scripts/weekly-stats
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: 설치
+        run: npm install --no-audit --no-fund
+
+      - name: 지난주 평균 계산 → stats/latest
+        env:
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node weekly-stats.mjs | tee -a "$GITHUB_STEP_SUMMARY"

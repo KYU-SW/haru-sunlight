@@ -1,0 +1,12 @@
+{
+  "name": "haru-sunlight-weekly-stats",
+  "private": true,
+  "description": "지난주 평균(stats/latest)을 매주 자동으로 계산 — .github/workflows/weekly-stats.yml",
+  "type": "module",
+  "scripts": {
+    "start": "node weekly-stats.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "14.5.0"
+  }
+}
