@@ -17,7 +17,8 @@ const RULES = readFileSync(fileURLToPath(new URL('../../firestore.rules', import
 
 /* 관리자 — 규칙의 이메일 목록 그대로. 규칙에 UID 목록이 있으면 그 UID로 접속한다 */
 const ADMIN_EMAIL = 'admin@haru-sunlight.firebaseapp.com';
-const uidMatch = RULES.match(/request\.auth\.uid in \['([^']+)'/);
+const CODE = RULES.split('\n').filter((l) => !l.trim().startsWith('//')).join('\n');   // 주석 속 예시는 빼고 본다
+const uidMatch = CODE.match(/request\.auth\.uid in \['([^']+)'/);
 const ADMIN_UID = uidMatch ? uidMatch[1] : 'admin-test-uid';
 
 let env;
@@ -107,6 +108,12 @@ test('users — 관리자 이메일이 아닌 계정은 남의 문서를 못 읽
   await seed('users/alice', userDoc());
   const fake = env.authenticatedContext('mallory', { email: 'admin@example.com' }).firestore();
   await assertFails(getDoc(doc(fake, 'users/alice')));
+});
+
+test('users — 관리자 이메일이어도 UID가 다르면 관리자가 아니다 (규칙에 UID를 묶었을 때)', { skip: !uidMatch && '규칙에 관리자 UID가 없음' }, async () => {
+  await seed('users/alice', userDoc());
+  const impostor = env.authenticatedContext('someone-else', { email: ADMIN_EMAIL }).firestore();
+  await assertFails(getDoc(doc(impostor, 'users/alice')));
 });
 
 /* ================= sessions/{uid}_{at} ================= */
