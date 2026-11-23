@@ -130,7 +130,7 @@ var HomeService = (function () {
         minutes: t.recommendMinutes,
         why: whyText(t.best),
         when: UI.hm(t.start) + '–' + UI.hm(t.end),
-        cta: { label: Notify.granted() ? '알림 예약됨' : '15분 전에 알려주기', action: 'notify', primary: true },
+        cta: { label: Notify.granted() ? '알림 예약됨' : Notify.lead() + '분 전에 알려주기', action: 'notify', primary: true },
         sub: { label: '그래도 지금 나갈래요', action: 'timer' },
         state: 'waiting'
       };

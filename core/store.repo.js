@@ -21,6 +21,7 @@ var Repo = (function () {
     notify: false,
     barrier: null,        // 햇빛을 못 쬔 가장 큰 이유 — 'time' · 'forgot' · 'weather' · 'burn' · 'lazy' (지난주 돌아보기에서 고름)
     barrierWeek: null,    // 그 이유를 고른 주(월요일) — 다음 주 팝업에서 그 뒤로 얼마나 바뀌었는지 보여 준다
+    fix: null,            // 이유에 맞춰 켠 조치 {reason, step, week, baseRate, done} — core/adapt.js (안 되면 다음 단계로)
     autoCloth: false,     // 켜면 그날 낮 최고 기온으로 옷차림을 하루 한 번 맞춘다 (Engine.clothingForTemp)
     autoClothDay: null,   // 마지막으로 맞춘 날 — 같은 날 직접 바꾼 옷차림은 덮어쓰지 않는다
     consent: null         // 기록 수집 동의 {agreed, version, at} — 답하기 전엔 null

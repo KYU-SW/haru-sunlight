@@ -253,7 +253,7 @@ var App = (function () {
       invalidate();
       if (ok) {
         var n = Notify.schedule(prescription());
-        UI.toast(n ? '햇빛 시간 ' + n + '번, 15분 전에 알려드릴게요' : '오늘 남은 햇빛 시간이 없어요');
+        UI.toast(n ? '햇빛 시간 ' + n + '번, ' + Notify.lead() + '분 전에 알려드릴게요' : '오늘 남은 햇빛 시간이 없어요');
       } else {
         UI.toast('브라우저에서 알림이 차단돼 있어요');
       }

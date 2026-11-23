@@ -99,6 +99,14 @@ var HomeView = (function () {
     return '<br>피부가 빨개지기까지 약 <b>' + Math.round(p.burn) + '분</b> — 처방은 그보다 짧아요';
   }
 
+  /* 조치 '짧게 나눠 쬐기' (core/adapt.js) — 바쁜 사람에게 두 번에 나눠도 된다고 알려 준다 */
+  function splitNote(minutes) {
+    var p = Repo.getProfile();
+    if (!window.Adapt || Adapt.current(p.fix) !== 'split') return '';
+    var n = Adapt.split(minutes);
+    return n ? '<br>바쁘면 <b>' + n + '분씩 두 번</b> 나눠 쬐어도 돼요' : '';
+  }
+
   function greeting(m) {
     var d = m.rx.date;
     var day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
@@ -110,9 +118,9 @@ var HomeView = (function () {
   function heroTile(m) {
     var h = m.hero, big, sub, art;
     if (h.state === 'open') {
-      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · 지금 나가면 좋아요' + burnNote(m); art = '☀️';
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · 지금 나가면 좋아요' + burnNote(m) + splitNote(h.minutes); art = '☀️';
     } else if (h.state === 'waiting') {
-      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · ' + h.kicker + ' 시작' + burnNote(m); art = '🌤️';
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · ' + h.kicker + ' 시작' + burnNote(m) + splitNote(h.minutes); art = '🌤️';
     } else {
       big = h.headline; sub = h.when; art = h.passed ? '🌇' : '🌧️';
     }

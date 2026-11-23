@@ -219,7 +219,8 @@ var SCENARIOS = [
     }).then(function () {
       var sv = w.__fsWrites.filter(function (x) { return /^surveys\//.test(x.path); })[0];
       ok('답이 surveys/{uid}_{지난주 월요일} 로 올라간다 (answer=forgot)', sv.path === 'surveys/test-uid-0001_' + w.__lastWeek && sv.data.answer === 'forgot', sv.path);
-      ok('설문 문서 — 규칙이 허용한 칸만', Object.keys(sv.data).sort().join(',') === 'answer,appVersion,at,uid,week', Object.keys(sv.data).sort().join(','));
+      ok('설문 문서 — 규칙이 허용한 칸만 · 켠 조치(fix=notify · step=0)', Object.keys(sv.data).sort().join(',') === 'answer,appVersion,at,fix,step,uid,week' &&
+         sv.data.fix === 'notify' && sv.data.step === 0, Object.keys(sv.data).sort().join(','));
       var p = w.Repo.getProfile();
       ok('깜빡해서 → 기기에 이유 저장 · 알림 켜기 버튼', p.barrier === 'forgot' && p.barrierWeek === w.__lastWeek && /알림 켜기/.test(txt(w, '#rp-go')));
       w.document.getElementById('rp-later').click();
@@ -242,6 +243,40 @@ var SCENARIOS = [
       return w.ReportView.afterTimer();
     }).then(function (again) {
       ok('닫아도 그 주엔 다시 안 뜬다', again === false);
+    });
+  }],
+
+  ['12-1. 적응 — 조치를 켠 다음 주엔 "도움이 됐나요?" · 별로고 기록도 줄면 다음 단계(30분 전 알림)', 'lastweek=1&stats=55&barrier=forgot&fix=0&fixbase=80', function (w) {
+    return loaded(w).then(function () { return w.ReportView.afterTimer(); }).then(function (shown) {
+      var t = txt(w, '#h-report');
+      ok('이유 대신 확인 질문 하나 — "지난번에 바꾼 \'햇빛 알림\', 도움이 됐나요?"', shown === true && /햇빛 알림.*도움이 됐나요/.test(t) && !/가장 큰 이유/.test(t) &&
+         w.document.querySelectorAll('#h-report .rp-b').length === 2, t.slice(0, 120));
+      w.document.querySelector('#h-report .rp-b[data-a="nothelped"]').click();
+      return until(function () { return w.document.getElementById('rp-later'); }, 5000);
+    }).then(function () {
+      var sv = w.__fsWrites.filter(function (x) { return /^surveys\//.test(x.path); })[0];
+      ok('답이 올라간다 (answer=nothelped · 확인한 조치 fix=notify · step=0)', !!sv && sv.data.answer === 'nothelped' && sv.data.fix === 'notify' && sv.data.step === 0);
+      var f = w.Repo.getProfile().fix;
+      ok('80% → 67%로 줄어서 다음 단계로 — 30분 전 알림 · 한 주 뒤 또 확인', w.Adapt.current(f) === 'notifyEarly' && f.week === w.__lastWeek && f.baseRate === 67 && !f.done);
+      ok('안내 — "\'햇빛 알림\' 대신 … 30분 전"', /햇빛 알림.*대신.*30분 전/.test(txt(w, '#rp-step')), txt(w, '#rp-step'));
+      ok('알림 시각이 30분 전으로 당겨진다', w.Notify.lead() === 30);
+      w.document.getElementById('rp-later').click();
+    });
+  }],
+
+  ['12-2. 적응 — "도움 됐어요"면 그대로 · 짧게 나눠 쬐기는 홈 처방에 "N분씩 두 번"', 'lastweek=1&barrier=time&fix=1', function (w) {
+    return loaded(w).then(function () { return w.ReportView.afterTimer(); }).then(function () {
+      ok('확인 질문 — "짧게 나눠 쬐기"', /짧게 나눠 쬐기.*도움이 됐나요/.test(txt(w, '#h-report')));
+      w.document.querySelector('#h-report .rp-b[data-a="helped"]').click();
+      return until(function () { return w.document.getElementById('rp-later'); }, 5000);
+    }).then(function () {
+      var f = w.Repo.getProfile().fix;
+      ok('유지하고 확인 끝 — 다음 주엔 이유를 다시 묻는다', w.Adapt.current(f) === 'split' && f.done === true && /그대로 이어 갈게요/.test(txt(w, '#rp-step')));
+      w.document.getElementById('rp-later').click();
+      w.App.invalidate(); w.App.go('home');
+      var sub = txt(w, '#screen-home .ha-sub'), min = w.App.prescription().windows[0].recommendMinutes;
+      ok('홈 처방에 "바쁘면 N분씩 두 번 나눠 쬐어도 돼요"', min < 6 ? !/두 번/.test(sub) : new RegExp(Math.ceil(min / 2) + '분씩 두 번').test(sub), sub);
+      ok('알림은 그대로 15분 전', w.Notify.lead() === 15);
     });
   }],
 

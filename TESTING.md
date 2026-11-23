@@ -9,15 +9,15 @@
 
 | 단계 | 페이지 | 무엇을 확인하나 | 외부 호출 | 최근 결과 |
 |---|---|---|---|---|
-| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 | 없음 | **133 PASS / 0 FAIL** |
-| 통합 | [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | 실제 앱 화면(index.html)을 띄워 **사용자 흐름 13가지**를 끝까지 — 기상청 → 처방 → 타이머 → 기록 → Firestore 업로드 → 회복 코스, 장애 상황 | 없음 (기상청 · Firebase 모의) | **64 PASS / 0 FAIL** |
+| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 · 이유에 맞춘 조치(유지 · 다음 단계 · 끝) | 없음 | **143 PASS / 0 FAIL** |
+| 통합 | [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | 실제 앱 화면(index.html)을 띄워 **사용자 흐름 15가지**를 끝까지 — 기상청 → 처방 → 타이머 → 기록 → Firestore 업로드 → 회복 코스, 장애 상황 | 없음 (기상청 · Firebase 모의) | **74 PASS / 0 FAIL** |
 | 실제 연결 | [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | 배포 사이트와 같은 경로로 **진짜 기상청 예보**(서울 · 부산 · 제주)를 받아 앱 계산까지 | 기상청 (읽기만) | **6 PASS / 0 FAIL** |
-| Firebase 규칙 | [`tests/firestore/rules.test.mjs`](tests/firestore/rules.test.mjs) | **Firebase 에뮬레이터(실제 Firestore 규칙 엔진)**에 저장소의 `firestore.rules`를 그대로 올려 29가지 검사 — 본인 기록 쓰기 · 남의 uid 거절 · 이메일 · 좌표 · 나이 원값 거절 · 값 범위 · 올린 기록 수정 · 삭제 금지 · 관리자 권한(이메일 + UID) · adminLog 수정 금지 · offline 관리자 전용 · 그 밖 경로 차단 · **지난주 평균 자동 계산**(scripts/weekly-stats) 4가지 — 지난주만 · 관리자 제외 · 평균 숫자만 씀 | 없음 (로컬 에뮬레이터 · `demo-` 프로젝트) | **33 PASS / 0 FAIL** |
+| Firebase 규칙 | [`tests/firestore/rules.test.mjs`](tests/firestore/rules.test.mjs) | **Firebase 에뮬레이터(실제 Firestore 규칙 엔진)**에 저장소의 `firestore.rules`를 그대로 올려 31가지 검사 — 본인 기록 쓰기 · 남의 uid 거절 · 이메일 · 좌표 · 나이 원값 거절 · 값 범위 · 올린 기록 수정 · 삭제 금지 · 관리자 권한(이메일 + UID) · adminLog 수정 금지 · offline 관리자 전용 · 설문(한 주 한 번 · 조치 이름 · 단계 범위) · 그 밖 경로 차단 · **지난주 평균 자동 계산**(scripts/weekly-stats) 4가지 — 지난주만 · 관리자 제외 · 평균 숫자만 씀 | 없음 (로컬 에뮬레이터 · `demo-` 프로젝트) | **35 PASS / 0 FAIL** |
 | 자동 | [Actions › Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) | 푸시 · PR마다 단위 + 통합(헤드리스 크롬) + Firebase 규칙(에뮬레이터)을 실행, 결과를 Summary 표로 공개 | 없음 | 배지 참고 ↓ |
 
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 
-최근 결과 기준: 2026-11-23 (v_2.4) · 단위 · 통합은 로컬 Chrome 헤드리스와 Actions(ubuntu-latest · Chrome · `TZ=Asia/Seoul`)에서 같은 결과, Firebase 규칙은 Actions(Java 21 · firebase-tools 15.37 · Firestore 에뮬레이터)에서 33 PASS (규칙 29 + 주간 평균 4).
+최근 결과 기준: 2026-11-23 (v_2.5) · 단위 · 통합은 로컬 Chrome 헤드리스와 Actions(ubuntu-latest · Chrome · `TZ=Asia/Seoul`)에서 같은 결과, Firebase 규칙은 Actions(Java 21 · firebase-tools 15.37 · Firestore 에뮬레이터)에서 35 PASS (규칙 31 + 주간 평균 4).
 실제 연결은 2026-11-23 14:45 KST, 중계 서버 경로 · 평균 응답 약 1.7초 (겨울이라 세 곳 모두 '겨울 모드' 판정).
 
 <table><tr>
@@ -84,7 +84,9 @@ google-chrome --headless=new --disable-gpu --virtual-time-budget=60000 \
 | 10 | 수집 동의를 안 한 사람 | 동의 화면이 먼저 · 동의 전 업로드 0건 |
 | 11 | 지난주에 쓴 사람 (평균 있음) | 타이머를 끝내면 가운데 팝업 · "다른 사람들은 평균 55% 채웠는데, 나는 67%" · 못 쬔 이유(깜빡) → `surveys/{uid}_{주}` (허용된 칸만) · 알림 켜기 제안 · 같은 주엔 다시 안 뜸 · 이유별로 앱이 바뀜(탈까 봐 → 홈에 화상 한계 시간, 시간 → 12주 추천) |
 | 12 | 지난번에 이유를 고른 사람 | 내 기록만 보여 줌 · "지난번엔 '깜빡해서'라고 하셨죠. 그 뒤로 33% → 67% 늘었어요" · 닫아도 그 주엔 다시 안 뜸 |
-| 13 | 회복 코스 · 날씨 이유 · 두 코스 같이 | 두 코스 같이 하기('코스 고르기' → '하는 중' 표시 → 다른 코스 시작 → 전환 버튼 2개 · "다녀왔어요" 한 번에 두 코스 채움 · 홈 카드 2장 · 하나만 그만두기) · 날씨 이유 → 햇빛 없는 날 '바깥 빛 20~30분으로 대신해요' · 코스 중인 겨울날 인사말 · 따로 칸 없이 추천 코스 카드에 '나에게 추천'과 이유(22세 · 기록 없음 → 8주) → 누르면 그 코스 소개 |
+| 12-1 | 지난주에 조치(햇빛 알림)를 켠 사람 · 기록이 줄어듦 | 이유 대신 "지난번에 바꾼 '햇빛 알림', 도움이 됐나요?" 하나 · '별로였어요' → `surveys`에 nothelped · fix=notify · 다음 단계(30분 전 알림)로 바뀌고 알림 시각도 30분 전 |
+| 12-2 | 조치(짧게 나눠 쬐기)가 도움 된 사람 | '도움 됐어요' → 그대로 두고 확인 끝 · 홈 처방에 "바쁘면 N분씩 두 번 나눠 쬐어도 돼요" · 알림은 15분 전 그대로 |
+| 13 | 회복 코스 · 날씨 이유 · 두 코스 같이 | 두 코스 같이 하기('코스 고르기' → '하는 중' 표시 → 다른 코스 시작 → 전환 버튼 2개 · "다녀왔어요" 한 번에 두 코스 채움 · 하나만 그만두기) · 날씨 이유 → 햇빛 없는 날 '바깥 빛 20~30분으로 대신해요' · 코스 중인 겨울날 인사말 · 따로 칸 없이 추천 코스 카드에 '나에게 추천'과 이유(22세 · 기록 없음 → 8주) → 누르면 그 코스 소개 |
 
 ## 5. 실제 기기에서 확인할 것 (체크리스트)
 

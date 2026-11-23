@@ -144,6 +144,8 @@
   if (q.get('barrier')) {
     var pf = JSON.parse(fakeStorage.getItem(NS + 'profile') || '{}');
     pf.barrier = q.get('barrier'); pf.barrierWeek = lwKey(-7);
+    /* 그 이유로 켠 조치(fix=단계) — 2주 전 주에 켰고, 그때 목표 채운 비율은 fixbase(기본 33%) */
+    if (q.get('fix') != null) pf.fix = { reason: pf.barrier, step: +q.get('fix'), week: lwKey(-7), baseRate: q.get('fixbase') ? +q.get('fixbase') : 33, done: false };
     fakeStorage.setItem(NS + 'profile', JSON.stringify(pf));
     var ss = JSON.parse(fakeStorage.getItem(NS + 'sessions') || '[]');
     [-7, -5, -3].forEach(function (n, i) {

@@ -13,7 +13,7 @@
    ========================================================= */
 var Sync = (function () {
 
-  var APP_VERSION = 'v_2.4';
+  var APP_VERSION = 'v_2.5';
   var KEY_UP = 'sunrx.uploaded';        // 올린 문서 ID 목록
   var KEY_USER = 'sunrx.userSynced';    // users 문서를 처음 만든 uid (createdAt을 한 번만 넣으려고)
   var CLOTHES = ['shortShort', 'shortLong', 'longLong'];
@@ -186,13 +186,16 @@ var Sync = (function () {
   }
 
   /* 한 문항 설문 — surveys/{uid}_{주 월요일}. 한 주에 한 번만 (규칙상 고칠 수 없다) */
-  function sendSurvey(week, answer) {
+  /* fix · step — 그 답으로 켠(또는 확인한) 조치와 단계 (core/adapt.js). 없으면 안 보낸다 */
+  function sendSurvey(week, answer, fix, step) {
     if (!enabled()) return Promise.reject(new Error('sync-disabled'));
     return Auth.signIn().then(function (u) {
-      return withTimeout(db.collection('surveys').doc(u.uid + '_' + week).set({
+      var doc = {
         uid: u.uid, week: week, answer: answer,
         at: firebase.firestore.FieldValue.serverTimestamp(), appVersion: APP_VERSION
-      }), 15000);
+      };
+      if (fix) { doc.fix = fix; doc.step = step || 0; }
+      return withTimeout(db.collection('surveys').doc(u.uid + '_' + week).set(doc), 15000);
     });
   }
 

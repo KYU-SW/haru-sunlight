@@ -8,6 +8,12 @@ var Notify = (function () {
   var LATE_MS = 10 * 60000;   // 예약 시각보다 이만큼 늦게 깨어나면 건너뛴다
   var timers = [];
 
+  /* '깜빡해서'가 두 번 나오면 30분 전으로 당긴다 (core/adapt.js notifyEarly) */
+  function lead() {
+    var p = window.Repo ? Repo.getProfile() : {};
+    return window.Adapt && Adapt.current(p.fix) === 'notifyEarly' ? 30 : LEAD_MIN;
+  }
+
   function supported() { return typeof Notification !== 'undefined'; }
   function granted() { return supported() && Notification.permission === 'granted'; }
 
@@ -54,7 +60,7 @@ var Notify = (function () {
     timers = [];
   }
 
-  /* 오늘 남은 창 전부에 대해 15분 전 알림 예약 (앱이 열려 있는 동안 유효) */
+  /* 오늘 남은 창 전부에 대해 15분(또는 30분) 전 알림 예약 (앱이 열려 있는 동안 유효) */
   function schedule(rx) {
     clear();
     if (!granted() || !rx || !rx.windows.length) return 0;
@@ -64,7 +70,7 @@ var Notify = (function () {
     rx.windows.forEach(function (w, i) {
       var t = new Date(rx.date);
       t.setHours(0, 0, 0, 0);
-      var fireAt = t.getTime() + (w.recommendStart - LEAD_MIN) * 60000;
+      var fireAt = t.getTime() + (w.recommendStart - lead()) * 60000;
       if (fireAt <= nowMs) return;
       var best = i === 0 && rx.windows.length > 1 ? ', 오늘 제일 좋은 시간이에요'
                : rx.windows.length === 1 ? ', 오늘 유일한 시간이에요' : '';
@@ -86,7 +92,7 @@ var Notify = (function () {
   }
 
   return {
-    LEAD_MIN: LEAD_MIN, supported: supported, granted: granted,
+    LEAD_MIN: LEAD_MIN, lead: lead, supported: supported, granted: granted,
     request: request, schedule: schedule, clear: clear, fire: fire, done: done
   };
 })();

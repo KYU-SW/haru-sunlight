@@ -353,9 +353,10 @@ var AdminView = (function () {
 
   /* 못 쬔 이유 설문 (타이머 끝난 뒤 '지난주 돌아보기') — 가장 최근 주 이유별 응답 + 이유를 답한 다음 주 변화 */
   function surveyTile() {
-    var list = state.surveys;
-    if (!list || !list.length || typeof Report === 'undefined') return null;
     var NAME = { time: '시간', forgot: '깜빡', weather: '날씨', burn: '탈까 봐', lazy: '귀찮아서', none: '없음' };
+    /* 이유 답만 — 조치 확인 답(helped · nothelped)은 checkTile 에서 따로 센다 */
+    var list = (state.surveys || []).filter(function (s) { return NAME[s.answer]; });
+    if (!list.length || typeof Report === 'undefined') return null;
     var week = list.map(function (s) { return s.week; }).sort().pop();
     var c = {}, n = 0;
     list.forEach(function (s) { if (s.week === week && NAME[s.answer]) { c[s.answer] = (c[s.answer] || 0) + 1; n++; } });
@@ -375,6 +376,24 @@ var AdminView = (function () {
              val: top.length ? '<b>' + NAME[top[0]] + '</b> ' + Math.round(c[top[0]] / n * 100) + '%' : '—',
              sub: week + ' 주 · 응답 ' + n + '명 · ' + top.map(function (k) { return NAME[k] + ' ' + c[k]; }).join(' · ') +
                   (avg === null ? '' : ' · 답한 다음 주 목표 채운 비율 ' + (avg >= 0 ? '+' : '') + avg + '%p (' + diffs.length + '명)') };
+  }
+
+  /* 조치 확인 질문 — '도움 됐어요' 비율 (조치별) · core/adapt.js */
+  function checkTile() {
+    var list = (state.surveys || []).filter(function (s) { return s.answer === 'helped' || s.answer === 'nothelped'; });
+    if (!list.length || typeof Adapt === 'undefined') return null;
+    var by = {}, yes = 0;
+    list.forEach(function (s) {
+      var k = s.fix || '?';
+      by[k] = by[k] || [0, 0];
+      by[k][1]++;
+      if (s.answer === 'helped') { by[k][0]++; yes++; }
+    });
+    return { lab: '바꾼 조치가 도움 됐나요 (확인 질문)',
+             val: '<b>' + Math.round(yes / list.length * 100) + '%</b> 도움 됐어요',
+             sub: '응답 ' + list.length + '번 · ' + Object.keys(by).map(function (k) {
+               return (Adapt.NAME[k] || k) + ' ' + by[k][0] + '/' + by[k][1];
+             }).join(' · ') };
   }
 
   function summaryHtml(x) {
@@ -400,6 +419,8 @@ var AdminView = (function () {
     );
     var sv = surveyTile();
     if (sv) tiles.push(sv);
+    var ck = checkTile();
+    if (ck) tiles.push(ck);
     return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-tiles">' + tiles.map(function (t) {
         return '<div class="ad-tile"><span class="ad-lab">' + t.lab + '</span><div class="ad-big">' + t.val + '</div>' +

@@ -294,7 +294,7 @@ var SettingsView = (function () {
       var cur = Repo.getProfile().notify && Notify.granted();
       SettingsService.toggleNotify(!cur).then(function (ok) {
         if (!cur && !ok) UI.toast('브라우저에서 알림이 차단돼 있어요');
-        else if (ok) UI.toast('햇빛 시간 ' + Notify.LEAD_MIN + '분 전에 알려드릴게요');
+        else if (ok) UI.toast('햇빛 시간 ' + Notify.lead() + '분 전에 알려드릴게요');
         after();
       });
     };

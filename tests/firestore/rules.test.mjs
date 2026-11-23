@@ -203,6 +203,15 @@ test('surveys — 남의 uid · ID 형식 불일치 · 없는 답 · 목록에 �
   await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { comment: '좋아요' })));
   await assertFails(setDoc(doc(db.guest(), 'surveys/alice_' + WEEK), SURVEY('alice')));
 });
+test('surveys — 조치 확인 답(helped · nothelped)과 켠 조치 · 단계를 같이 남긴다 (core/adapt.js)', async () => {
+  await assertSucceeds(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'nothelped', fix: 'notify', step: 0 })));
+  await assertSucceeds(setDoc(doc(db.anonBob(), 'surveys/bob_' + WEEK), SURVEY('bob', { answer: 'forgot', fix: 'notifyEarly', step: 1 })));
+});
+test('surveys — 목록에 없는 조치 · 범위 밖 단계는 거절', async () => {
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'helped', fix: 'hack' })));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'helped', fix: 'notify', step: 9 })));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'helped', fix: 'notify', step: '1' })));
+});
 test('surveys — 남긴 답은 고칠 수 없고, 본인 · 관리자만 읽는다', async () => {
   await seed('surveys/alice_' + WEEK, SURVEY('alice'));
   await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'time' })));

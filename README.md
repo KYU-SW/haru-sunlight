@@ -5,7 +5,7 @@
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 [![Deploy Pages](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml)
 
-`v_2.4` · 회복 코스 탭 (8주 · 12주 · 코스 추천) · 지난주 돌아보기 (평균 비교 · 한 줄 설문)
+`v_2.5` · 회복 코스 탭 (8주 · 12주 · 코스 추천) · 지난주 돌아보기 (평균 비교 · 한 줄 설문 · 이유에 맞춘 조치 → 효과 확인 → 다음 조치)
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html (관리자 로그인 필요 · 로그인 없이 **예시 데이터로 보기** 가능)  
@@ -146,7 +146,7 @@ flowchart TD
 | `sessions` | `{uid}_{시작 시각}` | `uid` · `dateKey` · `at` · `minutes`(1\~600) · `percent`(0\~300) · `clothing`(3종) · `limitedBy`(vitd · burn · heat) · `uploadedAt` | 본인은 **한 번 만들기만** (수정 · 삭제 불가), 관리자는 수정 시 `adminLog`에 남김 | 본인 · 관리자 |
 | `adminLog` | 자동 | `at` · `by` · `action` · `target` · `before` · `after` · `reason`(1\~200자) | 관리자 (**고치거나 지울 수 없음**) | 관리자 |
 | `stats` | `latest` 하나 | 지난주 평균 (타이머 끝난 뒤 '지난주 돌아보기'에서 비교) — `week`(월요일) · `n`(인원) · `goalRate`(목표 채운 비율 평균) · `minutes` · `updatedAt` · `by` | GitHub Actions가 매주 월요일 01:00 자동 갱신 (관리자 대시보드를 열 때도) | 로그인한 사람 |
-| `surveys` | `{uid}_{주 월요일}` | 햇빛을 못 쬔 가장 큰 이유 — `uid` · `week` · `answer`(time · forgot · weather · burn · lazy · none) · `at` · `appVersion` | 본인만 **한 주에 한 번** (수정 · 삭제 불가) | 본인 · 관리자 |
+| `surveys` | `{uid}_{주 월요일}` | 햇빛을 못 쬔 가장 큰 이유 또는 지난번 조치 확인 — `uid` · `week` · `answer`(time · forgot · weather · burn · lazy · none · helped · nothelped) · `fix`(켠 조치) · `step`(단계) · `at` · `appVersion` | 본인만 **한 주에 한 번** (수정 · 삭제 불가) | 본인 · 관리자 |
 | `offline` | 익명 ID (영문 소문자 · 숫자 4\~12자) | 현장 참가자 요약 — `records` · `setRate` · `goalDone` · `goalTotal` · `before` · `after` · `exceptions` | 관리자 | 관리자 |
 
 - **보내지 않는 것:** 이름 · 이메일 · 좌표 · 시군구 · 나이 · 키 · 몸무게 원값 (나이는 연령대, 키 · 몸무게는 BMI 구간으로만). 규칙이 목록에 없는 칸을 거절합니다.
@@ -308,3 +308,4 @@ tests/                테스트 · 모의 데이터 화면 (smoke · integration
 | `v_2.2` | **교수 피드백 반영** — README에 대상 사용자 · 기존 앱 한계 · 기능 비교표 · 기대 효과 측정 지표 · 데이터 흐름 그림(Mermaid) · 오류 처리 표 · 팀 기여 · 화면 캡처(`docs/images/`), 통합 테스트(`tests/integration.html`, 시나리오 10개 · 42항목), 실제 기상청 연결 확인(`tests/live.html`), 자동 테스트 워크플로(`test.yml`), [`TESTING.md`](TESTING.md) |
 | `v_2.3` | 피부 타입 말 바꾸기("타다 · 그을리다" → "빨개지다 · 까매지다", 온보딩에 두 말 뜻 표시), 피부 타입 풀이(온보딩 · 마이페이지 "피부 타입이 뭐예요?" — 6단계 쉬운 설명, 펼쳐 보기), 마이페이지 **기온에 맞춰 옷차림 자동** 켜기/끄기(오늘 낮 9\~18시 최고 기온 23℃↑ 반팔+반바지 · 20\~22℃ 반팔+긴바지 · 20℃ 미만 긴팔+긴바지, 하루 한 번 · 같은 날 직접 바꾼 건 유지) |
 | `v_2.4` | **회복 코스 추천** — 따로 칸 없이 추천 코스 카드에 '나에게 추천' 표시와 이유(질문 없이 받은 정보로: 최근 2주 주 평균 5일 이상 → 8주 매일 · 그 아래 → 12주, 기록이 없으면 18~39세 → 8주 · 그 밖 → 12주, 이유와 함께), **지난주 돌아보기** — 타이머가 끝난 뒤 한 주에 한 번 가운데 팝업(내 지난주 목표 채운 날 · 쬔 시간, 다른 사람 평균과 비교 — 관리자 대시보드가 `stats/latest`에 평균만 올림 · 3명 이상일 때만), "다른 사람들은 평균 55% 채웠는데, 나는 67% 채웠어요" 한 줄로 크게(하루 목표를 채운 비율), 한 문항 '햇빛을 못 쬔 날, 가장 큰 이유는?'(시간 · 깜빡 · 날씨 · 탈까 봐 · 귀찮아서) → **앱이 그 이유에 맞게 바뀜**(시간 → 12주 코스 추천, 깜빡 → 알림 켜기, 날씨 → 햇빛 없는 날 바깥 빛 안내, 탈까 봐 → 홈에 화상 한계 시간 표시, 귀찮아서 → 회복 코스), 다음 주 팝업에서 '그 뒤로 33% → 67%'처럼 효과 확인, 답은 `surveys`에 모여 관리자 대시보드에 이유별 응답 · 답한 다음 주 변화(%p), 회복 코스 중인 겨울날 홈 인사말, **두 코스 같이 하기**(코스 화면 위 '코스 고르기'로 돌아가 하나 더 시작 · 하는 코스는 '하는 중' · 맨 위 전환 · 하루 할 일은 한 번에 두 코스 체크 · 그만두기는 코스별, 기기 저장 `courses`). **Firestore 규칙 다시 게시 필요** |
+| `v_2.5` | **이유에 맞춘 조치 → 효과 확인 → 다음 조치** ([CALCULATION.md 11장](CALCULATION.md)) — 못 쬔 이유를 고르면 1단계 조치를 켜고, 다음 주 팝업은 이유 대신 "지난번에 바꾼 '○○', 도움이 됐나요?" 하나만 물음. 도움 됐거나 목표 채운 비율이 올랐으면 유지, 아니면 2단계로 바꿈 · 같은 이유가 또 나와도 2단계로(시간: 12주 추천 → 짧게 나눠 쬐기 'N분씩 두 번', 깜빡: 알림 → 30분 전 알림, 날씨: 바깥 빛 안내 → 회복 코스, 탈까 봐: 화상 한계 표시 → 피부 타입 다시 확인, 귀찮아서: 회복 코스 → 짧게 나눠 쬐기). `surveys`에 켠 조치 · 단계를 같이 남기고 관리자 대시보드에 조치별 '도움 됐어요' 비율. 홈에서 회복 코스 카드 뺌(회복 코스 탭에서만). **Firestore 규칙 다시 게시 필요** |

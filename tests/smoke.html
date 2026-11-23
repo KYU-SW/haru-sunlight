@@ -12,6 +12,7 @@
 <script src="../core/weather.api.js"></script>
 <script src="../core/course.js"></script>
 <script src="../core/report.js"></script>
+<script src="../core/adapt.js"></script>
 <script src="../shared/ui.js"></script>
 <script src="../core/prescription.js"></script>
 <script src="../shared/chart.js"></script>
@@ -369,6 +370,30 @@ ok('평균 — 지난주에 쓴 사람만 (a 50% · b 100% → 2명 · 75% · 11
 ok('비교 — 3명 미만이면 보여 주지 않는다', Report.compare(rmA, rsum) === null);
 ok('비교 — 3명 이상 · 같은 주면 차이(%p)', Report.compare(rmA, { week: '2026-11-16', n: 5, goalRate: 40, minutes: 20 }).diff === 10 &&
    Report.compare(rmA, { week: '2026-11-09', n: 5, goalRate: 40, minutes: 20 }) === null);
+/* 적응형 개인화 (core/adapt.js) — 이유 → 조치 → 확인 → 안 되면 다음 조치 */
+var af = Adapt.onReason(null, 'forgot', '2026-11-09', 33);
+ok('적응 — 처음 고른 이유는 1단계 조치 (깜빡 → 햇빛 알림)', af.step === 0 && Adapt.current(af) === 'notify' && af.baseRate === 33 && !af.done);
+ok('적응 — 같은 이유가 또 나오면 다음 단계 (깜빡 → 30분 전 알림) · 마지막 단계에서 멈춘다',
+   Adapt.current(Adapt.onReason(af, 'forgot', '2026-11-16', 40)) === 'notifyEarly' &&
+   Adapt.onReason(Adapt.onReason(af, 'forgot', 'w2', 0), 'forgot', 'w3', 0).step === 1);
+ok('적응 — 다른 이유면 그 이유의 1단계부터 · "다 채웠어요"는 조치 없음',
+   Adapt.current(Adapt.onReason(af, 'time', '2026-11-16', 40)) === 'course12' && Adapt.onReason(af, 'none', 'w', 0) === null);
+ok('적응 — 확인 질문은 조치를 켠 바로 다음 주에만', Adapt.needCheck(af, '2026-11-16') && !Adapt.needCheck(af, '2026-11-23') &&
+   !Adapt.needCheck(af, '2026-11-09') && !Adapt.needCheck(null, '2026-11-16'));
+var ac1 = Adapt.onCheck(af, true, 20, '2026-11-16');
+ok('적응 — "도움 됐어요"면 기록이 줄어도 유지하고 확인 끝', ac1.result === 'kept' && ac1.fix.done && Adapt.current(ac1.fix) === 'notify' &&
+   !Adapt.needCheck(ac1.fix, '2026-11-16'));
+var ac2 = Adapt.onCheck(af, false, 67, '2026-11-16');
+ok('적응 — "별로였어요"여도 기록이 늘었으면(33 → 67%) 유지', ac2.result === 'kept' && ac2.improved);
+var ac3 = Adapt.onCheck(af, false, 33, '2026-11-16');
+ok('적응 — 답도 별로 · 기록도 그대로면 다음 단계로 바꾸고 한 주 뒤 또 확인',
+   ac3.result === 'next' && Adapt.current(ac3.fix) === 'notifyEarly' && ac3.fix.week === '2026-11-16' && ac3.fix.baseRate === 33 &&
+   Adapt.needCheck(ac3.fix, '2026-11-23'));
+var ac4 = Adapt.onCheck(ac3.fix, false, 20, '2026-11-23');
+ok('적응 — 마지막 단계도 안 되면 끝내고 다음 주엔 이유를 다시 묻는다', ac4.result === 'end' && ac4.fix.done && !Adapt.needCheck(ac4.fix, '2026-11-30'));
+ok('적응 — 모든 이유에 조치가 2단계씩 · 이름이 다 있다', Object.keys(Adapt.LADDER).every(function (k) {
+   return Adapt.LADDER[k].length === 2 && Adapt.LADDER[k].every(function (n) { return !!Adapt.NAME[n]; }); }));
+ok('적응 — 짧게 나눠 쬐기: 6분 이상만 두 번으로 (13분 → 7분씩)', Adapt.split(13) === 7 && Adapt.split(10) === 5 && Adapt.split(5) === null);
 ok('코스 추천 — 지난번 이유가 "시간이 없어서"면 기록과 상관없이 12주', Course.recommend({ age: 22, barrier: 'time' }, recS(10), '2026-11-23').type === 'load12' &&
    Course.recommend({ age: 22, barrier: 'time' }, [], '2026-11-23').reason === 'time');
 ok('type 없는 예전 기록은 8주 매일 코스', Course.typeOf({ start: cStart }).id === 'daily8' && cm.type.id === 'daily8');
