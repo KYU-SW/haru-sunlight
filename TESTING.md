@@ -9,20 +9,20 @@
 
 | 단계 | 페이지 | 무엇을 확인하나 | 외부 호출 | 최근 결과 |
 |---|---|---|---|---|
-| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 | 없음 | **123 PASS / 0 FAIL** |
+| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 | 없음 | **124 PASS / 0 FAIL** |
 | 통합 | [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | 실제 앱 화면(index.html)을 띄워 **사용자 흐름 10가지**를 끝까지 — 기상청 → 처방 → 타이머 → 기록 → Firestore 업로드 → 회복 코스, 장애 상황 | 없음 (기상청 · Firebase 모의) | **42 PASS / 0 FAIL** |
 | 실제 연결 | [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | 배포 사이트와 같은 경로로 **진짜 기상청 예보**(서울 · 부산 · 제주)를 받아 앱 계산까지 | 기상청 (읽기만) | **6 PASS / 0 FAIL** |
-| Firebase 규칙 | [`tests/firestore/rules.test.mjs`](tests/firestore/rules.test.mjs) | **Firebase 에뮬레이터(실제 Firestore 규칙 엔진)**에 저장소의 `firestore.rules`를 그대로 올려 23가지 검사 — 본인 기록 쓰기 · 남의 uid 거절 · 이메일 · 좌표 · 나이 원값 거절 · 값 범위 · 올린 기록 수정 · 삭제 금지 · 관리자 권한 · adminLog 수정 금지 · offline 관리자 전용 · 그 밖 경로 차단 | 없음 (로컬 에뮬레이터 · `demo-` 프로젝트) | **23 PASS / 0 FAIL** |
+| Firebase 규칙 | [`tests/firestore/rules.test.mjs`](tests/firestore/rules.test.mjs) | **Firebase 에뮬레이터(실제 Firestore 규칙 엔진)**에 저장소의 `firestore.rules`를 그대로 올려 24가지 검사 — 본인 기록 쓰기 · 남의 uid 거절 · 이메일 · 좌표 · 나이 원값 거절 · 값 범위 · 올린 기록 수정 · 삭제 금지 · 관리자 권한(이메일 + UID) · adminLog 수정 금지 · offline 관리자 전용 · 그 밖 경로 차단 | 없음 (로컬 에뮬레이터 · `demo-` 프로젝트) | **24 PASS / 0 FAIL** |
 | 자동 | [Actions › Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) | 푸시 · PR마다 단위 + 통합(헤드리스 크롬) + Firebase 규칙(에뮬레이터)을 실행, 결과를 Summary 표로 공개 | 없음 | 배지 참고 ↓ |
 
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 
-최근 결과 기준: 2026-11-23 (v_2.2) · 단위 · 통합은 로컬 Chrome 헤드리스와 Actions(ubuntu-latest · Chrome · `TZ=Asia/Seoul`)에서 같은 결과, Firebase 규칙은 Actions(Java 21 · firebase-tools 15.37 · Firestore 에뮬레이터)에서 23 PASS.
+최근 결과 기준: 2026-11-23 (v_2.2) · 단위 · 통합은 로컬 Chrome 헤드리스와 Actions(ubuntu-latest · Chrome · `TZ=Asia/Seoul`)에서 같은 결과, Firebase 규칙은 Actions(Java 21 · firebase-tools 15.37 · Firestore 에뮬레이터)에서 24 PASS.
 실제 연결은 2026-11-23 14:45 KST, 중계 서버 경로 · 평균 응답 약 1.7초 (겨울이라 세 곳 모두 '겨울 모드' 판정).
 
 <table><tr>
 <td valign="top"><img src="docs/images/test-integration.png" width="430" alt="통합 테스트 결과"><br><sub>통합 테스트 — 42 PASS / 0 FAIL</sub></td>
-<td valign="top"><img src="docs/images/test-smoke.png" width="430" alt="단위 테스트 결과"><br><sub>단위 테스트 — 123 PASS / 0 FAIL (윗부분)</sub></td>
+<td valign="top"><img src="docs/images/test-smoke.png" width="430" alt="단위 테스트 결과"><br><sub>단위 테스트 — 124 PASS / 0 FAIL (윗부분)</sub></td>
 </tr></table>
 
 ## 2. 실행 방법

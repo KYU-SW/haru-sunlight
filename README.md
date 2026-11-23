@@ -150,7 +150,7 @@ flowchart TD
 - **보내지 않는 것:** 이름 · 이메일 · 좌표 · 시군구 · 나이 · 키 · 몸무게 원값 (나이는 연령대, 키 · 몸무게는 BMI 구간으로만). 규칙이 목록에 없는 칸을 거절합니다.
 - **중복 · 조작 방지:** 문서 ID가 `uid_시각` 형식이 아니면 거절, 한 번 올린 기록은 참가자가 고칠 수 없음, 글자 칸은 형식 · 길이 검사(통계 오염 · CSV 수식 주입 방지).
 - 위 4개 외 경로는 전부 막혀 있습니다.
-- **검증:** 규칙은 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)에서 23가지 경우로 검사하고(`tests/firestore/`, 푸시마다 자동),
+- **검증:** 규칙은 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)에서 24가지 경우로 검사하고(`tests/firestore/`, 푸시마다 자동),
   앱이 실제로 보내는 문서 모양은 통합 테스트 시나리오 2가 검사합니다. 실제 Firebase 프로젝트는 테스트에 쓰지 않습니다.
 
 ## 팀 · 기여
@@ -217,7 +217,7 @@ python -m http.server 8762
 | `tests/smoke.html` | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
 | `tests/integration.html` | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의) |
 | `tests/live.html` | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 (배포 사이트에서 열기) |
-| `tests/firestore/` | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 23가지 검사 (`npm test`, Java 21 필요) |
+| `tests/firestore/` | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 24가지 검사 (`npm test`, Java 21 필요) |
 | `tests/timer-running.html` | 타이머가 돌아가는 상태 확인 |
 
 ## 폴더 구조
