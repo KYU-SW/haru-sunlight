@@ -178,6 +178,40 @@ test('offline — 관리자만 읽고 쓰며, 값 범위를 검사한다', async
   await assertFails(setDoc(doc(db.admin(), 'offline/p03c'), Object.assign({}, OFF, { goalDone: 11 })));
   await assertFails(setDoc(doc(db.admin(), 'offline/Name-Kim'), OFF));
 });
+/* ================= stats · surveys (지난주 돌아보기) ================= */
+const STAT = { week: '2026-11-16', n: 12, goalRate: 55, minutes: 48, updatedAt: serverTimestamp(), by: ADMIN_UID };
+test('stats — 관리자만 latest 에 숫자 셋을 올리고, 로그인한 사람은 읽는다', async () => {
+  await assertSucceeds(setDoc(doc(db.admin(), 'stats/latest'), STAT));
+  await assertSucceeds(getDoc(doc(db.anonBob(), 'stats/latest')));
+  await assertFails(getDoc(doc(db.guest(), 'stats/latest')));
+  await assertFails(setDoc(doc(db.alice(), 'stats/latest'), Object.assign({}, STAT, { by: 'alice' })));
+});
+test('stats — 다른 문서 이름 · 목록에 없는 칸 · 범위 밖 값은 거절', async () => {
+  await assertFails(setDoc(doc(db.admin(), 'stats/other'), STAT));
+  await assertFails(setDoc(doc(db.admin(), 'stats/latest'), Object.assign({}, STAT, { uids: ['alice'] })));
+  await assertFails(setDoc(doc(db.admin(), 'stats/latest'), Object.assign({}, STAT, { goalRate: 101 })));
+});
+const WEEK = '2026-11-16';
+const SURVEY = (uid, over) => Object.assign({ uid: uid, week: WEEK, answer: 'forgot', at: serverTimestamp(), appVersion: 'v_2.4' }, over || {});
+test('surveys — 본인 답을 한 주에 한 번 남긴다', async () => {
+  await assertSucceeds(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice')));
+});
+test('surveys — 남의 uid · ID 형식 불일치 · 없는 답 · 목록에 없는 칸은 거절', async () => {
+  await assertFails(setDoc(doc(db.alice(), 'surveys/bob_' + WEEK), SURVEY('bob')));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_2026-11-09'), SURVEY('alice')));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'great' })));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { comment: '좋아요' })));
+  await assertFails(setDoc(doc(db.guest(), 'surveys/alice_' + WEEK), SURVEY('alice')));
+});
+test('surveys — 남긴 답은 고칠 수 없고, 본인 · 관리자만 읽는다', async () => {
+  await seed('surveys/alice_' + WEEK, SURVEY('alice'));
+  await assertFails(setDoc(doc(db.alice(), 'surveys/alice_' + WEEK), SURVEY('alice', { answer: 'time' })));
+  await assertFails(deleteDoc(doc(db.alice(), 'surveys/alice_' + WEEK)));
+  await assertSucceeds(getDoc(doc(db.alice(), 'surveys/alice_' + WEEK)));
+  await assertFails(getDoc(doc(db.anonBob(), 'surveys/alice_' + WEEK)));
+  await assertSucceeds(getDoc(doc(db.admin(), 'surveys/alice_' + WEEK)));
+});
+
 test('그 밖의 경로는 전부 막힌다', async () => {
   await assertFails(setDoc(doc(db.alice(), 'anything/x'), { a: 1 }));
   await assertFails(getDoc(doc(db.admin(), 'anything/x')));

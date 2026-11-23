@@ -125,7 +125,25 @@ var Course = (function () {
     };
   }
 
+  /* 코스 추천 — 질문 없이 이미 있는 정보로 둘 중 하나
+       최근 2주 타이머 기록이 있으면  주 평균 사용 일수 5일 이상 → daily8 (매일 하던 대로) · 그 아래 → load12 (주 3번부터)
+       기록이 아직 없으면           나이 18~39세 → daily8 (Joh 2020 서울 18~39세와 같은 나이) · 그 밖 · 모름 → load12
+     돌려주는 값 { type, reason, perWeek? } — reason: 'habit' | 'light' | 'age' | 'start' */
+  function recommend(profile, sessions, todayKey) {
+    if (profile && profile.barrier === 'time') return { type: 'load12', reason: 'time' };   // 지난주 돌아보기에서 '시간이 없어서'
+    var from = addKey(todayKey, -13), days = {};
+    (sessions || []).forEach(function (s) { if (s && s.dateKey >= from && s.dateKey <= todayKey) days[s.dateKey] = 1; });
+    var n = Object.keys(days).length;
+    if (n) {
+      var perWeek = Math.round(n / 2 * 10) / 10;
+      return perWeek >= 5 ? { type: 'daily8', reason: 'habit', perWeek: perWeek } : { type: 'load12', reason: 'light', perWeek: perWeek };
+    }
+    var age = profile && profile.age;
+    return age >= 18 && age <= 39 ? { type: 'daily8', reason: 'age' } : { type: 'load12', reason: 'start' };
+  }
+
   return {
+    recommend: recommend,
     DAYS: DAYS, WEEKS: WEEKS, LIGHT_MIN: LIGHT_MIN, LIGHT_MAX: LIGHT_MAX, GOAL: GOAL,
     TYPES: TYPES, ORDER: ORDER, typeOf: typeOf,
     kindFor: kindFor, dayState: dayState, model: model, addKey: addKey

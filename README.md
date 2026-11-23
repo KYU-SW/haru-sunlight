@@ -5,7 +5,7 @@
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 [![Deploy Pages](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml)
 
-`v_2.3` · 회복 코스 탭 (8주 · 12주) · 피부 타입 풀이 · 기온별 옷차림 자동
+`v_2.4` · 회복 코스 탭 (8주 · 12주 · 코스 추천) · 지난주 돌아보기 (평균 비교 · 한 줄 설문)
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html (관리자 로그인 필요 · 로그인 없이 **예시 데이터로 보기** 가능)  
@@ -145,12 +145,14 @@ flowchart TD
 | `users` | Auth uid | `consentedAt` · `consentVersion` · `skinType`(1\~6) · `sido`(시 · 도 이름) · `ageGroup`(10\~70) · `bmiGroup`(5구간) · `notify` · `appVersion` · `createdAt` · `updatedAt` | 본인만 | 본인 · 관리자 |
 | `sessions` | `{uid}_{시작 시각}` | `uid` · `dateKey` · `at` · `minutes`(1\~600) · `percent`(0\~300) · `clothing`(3종) · `limitedBy`(vitd · burn · heat) · `uploadedAt` | 본인은 **한 번 만들기만** (수정 · 삭제 불가), 관리자는 수정 시 `adminLog`에 남김 | 본인 · 관리자 |
 | `adminLog` | 자동 | `at` · `by` · `action` · `target` · `before` · `after` · `reason`(1\~200자) | 관리자 (**고치거나 지울 수 없음**) | 관리자 |
+| `stats` | `latest` 하나 | 지난주 평균 (타이머 끝난 뒤 '지난주 돌아보기'에서 비교) — `week`(월요일) · `n`(인원) · `goalRate`(목표 채운 비율 평균) · `minutes` · `updatedAt` · `by` | 관리자 (대시보드를 열 때 갱신) | 로그인한 사람 |
+| `surveys` | `{uid}_{주 월요일}` | 햇빛을 못 쬔 가장 큰 이유 — `uid` · `week` · `answer`(time · forgot · weather · burn · lazy · none) · `at` · `appVersion` | 본인만 **한 주에 한 번** (수정 · 삭제 불가) | 본인 · 관리자 |
 | `offline` | 익명 ID (영문 소문자 · 숫자 4\~12자) | 현장 참가자 요약 — `records` · `setRate` · `goalDone` · `goalTotal` · `before` · `after` · `exceptions` | 관리자 | 관리자 |
 
 - **보내지 않는 것:** 이름 · 이메일 · 좌표 · 시군구 · 나이 · 키 · 몸무게 원값 (나이는 연령대, 키 · 몸무게는 BMI 구간으로만). 규칙이 목록에 없는 칸을 거절합니다.
 - **중복 · 조작 방지:** 문서 ID가 `uid_시각` 형식이 아니면 거절, 한 번 올린 기록은 참가자가 고칠 수 없음, 글자 칸은 형식 · 길이 검사(통계 오염 · CSV 수식 주입 방지).
-- 위 4개 외 경로는 전부 막혀 있습니다.
-- **검증:** 규칙은 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)에서 24가지 경우로 검사하고(`tests/firestore/`, 푸시마다 자동),
+- 위 6개 외 경로는 전부 막혀 있습니다. 다른 사람 평균은 **3명 이상일 때만** 앱에 보여 줍니다 (누구 기록인지 짐작되지 않게).
+- **검증:** 규칙은 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)에서 29가지 경우로 검사하고(`tests/firestore/`, 푸시마다 자동),
   앱이 실제로 보내는 문서 모양은 통합 테스트 시나리오 2가 검사합니다. 실제 Firebase 프로젝트는 테스트에 쓰지 않습니다.
 
 ## 팀 · 기여
@@ -172,7 +174,7 @@ flowchart TD
 | **회복 코스** | 코스 고르기(8주 매일 · 12주 채우고 유지) → 코스별 소개(왜 이 기간인지, 애니메이션) → 오늘 할 일 · 진행 · 기록 · 달성률, 끝나면 첫 2주 vs 마지막 2주 비교. 화면에서 '근거 보기'로 논문 요약 (근거: `CALCULATION.md` 10장) |
 | **마이페이지** | 내 햇빛 기록 · 내 정보(피부 타입 · 옷차림) · 알림 · 지역 |
 
-<table><tr><td align="center"><img src="docs/images/course-pick.png" width="220" alt="코스 고르기"><br><sub>코스 고르기</sub></td><td align="center"><img src="docs/images/course-tour.png" width="220" alt="코스 소개 — 왜 8주인가"><br><sub>코스 소개 — 왜 8주인가</sub></td></tr></table>
+<table><tr><td align="center"><img src="docs/images/course-pick.png" width="220" alt="코스 고르기"><br><sub>코스 고르기</sub></td><td align="center"><img src="docs/images/course-tour.png" width="220" alt="코스 소개 — 왜 8주인가"><br><sub>코스 소개 — 왜 8주인가</sub></td><td align="center"><img src="docs/images/weekly-popup.png" width="220" alt="지난주 돌아보기"><br><sub>타이머 끝난 뒤 — 지난주 돌아보기</sub></td></tr></table>
 
 **타이머**는 탭이 아니라 홈에서 '타이머 시작'을 누르면 열립니다 — 밖에 있는 동안 남은 시간 · 충전률, 옷차림을 바꾸면 바로 다시 계산.
 
@@ -235,9 +237,9 @@ python -m http.server 8762
 |---|---|
 | `tests/seed.html?tab=home` (로컬 개발용) | 모의 날씨 · 기록을 넣고 바로 화면 확인 (`&uvi=9&temp=37` 처럼 조건 변경 가능) |
 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
-| [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의) |
+| [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 13가지 (기상청 · Firebase는 모의) |
 | [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 |
-| [`tests/firestore/`](tests/firestore/rules.test.mjs) | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 24가지 검사 (`npm test`, Java 21 필요) |
+| [`tests/firestore/`](tests/firestore/rules.test.mjs) | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 29가지 검사 (`npm test`, Java 21 필요) |
 | `tests/timer-running.html` (로컬 개발용) | 타이머가 돌아가는 상태 확인 |
 
 ## 폴더 구조
@@ -293,3 +295,4 @@ tests/                테스트 · 모의 데이터 화면 (smoke · integration
 | `v_2.1` | 관리자 대시보드 '현장에서 모은 기록' — Firestore `offline`(현장 참가자별 요약 · 익명 ID)을 읽어 요약 · 타이머 기록에 함께 계산(지연 시간 · 예외 카드 추가, '하루에 채운 양' 칸 → 앱 · 현장 기록을 합친 '하루 목표를 채운 비율'), 설정 탭에서 익명화한 파일 올리기 · 지우기(변경 내역에 남김). **Firestore 규칙 다시 게시 필요** |
 | `v_2.2` | **교수 피드백 반영** — README에 대상 사용자 · 기존 앱 한계 · 기능 비교표 · 기대 효과 측정 지표 · 데이터 흐름 그림(Mermaid) · 오류 처리 표 · 팀 기여 · 화면 캡처(`docs/images/`), 통합 테스트(`tests/integration.html`, 시나리오 10개 · 42항목), 실제 기상청 연결 확인(`tests/live.html`), 자동 테스트 워크플로(`test.yml`), [`TESTING.md`](TESTING.md) |
 | `v_2.3` | 피부 타입 말 바꾸기("타다 · 그을리다" → "빨개지다 · 까매지다", 온보딩에 두 말 뜻 표시), 피부 타입 풀이(온보딩 · 마이페이지 "피부 타입이 뭐예요?" — 6단계 쉬운 설명, 펼쳐 보기), 마이페이지 **기온에 맞춰 옷차림 자동** 켜기/끄기(오늘 낮 9\~18시 최고 기온 23℃↑ 반팔+반바지 · 20\~22℃ 반팔+긴바지 · 20℃ 미만 긴팔+긴바지, 하루 한 번 · 같은 날 직접 바꾼 건 유지) |
+| `v_2.4` | **회복 코스 추천** — 따로 칸 없이 추천 코스 카드에 '나에게 추천' 표시와 이유(질문 없이 받은 정보로: 최근 2주 주 평균 5일 이상 → 8주 매일 · 그 아래 → 12주, 기록이 없으면 18~39세 → 8주 · 그 밖 → 12주, 이유와 함께), **지난주 돌아보기** — 타이머가 끝난 뒤 한 주에 한 번 가운데 팝업(내 지난주 목표 채운 날 · 쬔 시간, 다른 사람 평균과 비교 — 관리자 대시보드가 `stats/latest`에 평균만 올림 · 3명 이상일 때만), "다른 사람들은 평균 55% 채웠는데, 나는 67% 채웠어요" 한 줄로 크게(하루 목표를 채운 비율), 한 문항 '햇빛을 못 쬔 날, 가장 큰 이유는?'(시간 · 깜빡 · 날씨 · 탈까 봐 · 귀찮아서) → **앱이 그 이유에 맞게 바뀜**(시간 → 12주 코스 추천, 깜빡 → 알림 켜기, 날씨 → 햇빛 없는 날 바깥 빛 안내, 탈까 봐 → 홈에 화상 한계 시간 표시, 귀찮아서 → 회복 코스), 다음 주 팝업에서 '그 뒤로 33% → 67%'처럼 효과 확인, 답은 `surveys`에 모여 관리자 대시보드에 이유별 응답 · 답한 다음 주 변화(%p), 회복 코스 중인 겨울날 홈 인사말, **두 코스 같이 하기**(코스 화면 위 '코스 고르기'로 돌아가 하나 더 시작 · 하는 코스는 '하는 중' · 맨 위 전환 · 하루 할 일은 한 번에 두 코스 체크 · 그만두기는 코스별, 기기 저장 `courses`). **Firestore 규칙 다시 게시 필요** |

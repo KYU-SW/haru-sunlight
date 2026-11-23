@@ -13,7 +13,7 @@
    ========================================================= */
 var Sync = (function () {
 
-  var APP_VERSION = 'v_2.3';
+  var APP_VERSION = 'v_2.4';
   var KEY_UP = 'sunrx.uploaded';        // 올린 문서 ID 목록
   var KEY_USER = 'sunrx.userSynced';    // users 문서를 처음 만든 uid (createdAt을 한 번만 넣으려고)
   var CLOTHES = ['shortShort', 'shortLong', 'longLong'];
@@ -176,5 +176,26 @@ var Sync = (function () {
     return readJSON(KEY_UP, []).filter(function (id) { return id.indexOf(uid + '_') === 0; }).length;
   }
 
-  return { run: run, start: start, count: count, available: function () { return !!db; } };
+  /* 지난주 다른 사람 평균 — 관리자 대시보드가 stats/latest 에 올려 둔 숫자 하나. 못 받으면 null */
+  function weeklyStats() {
+    if (!enabled() || navigator.onLine === false) return Promise.resolve(null);
+    return Auth.signIn()
+      .then(function () { return withTimeout(db.collection('stats').doc('latest').get(), 10000); })
+      .then(function (snap) { return snap && snap.exists ? snap.data() : null; })
+      .catch(function () { return null; });
+  }
+
+  /* 한 문항 설문 — surveys/{uid}_{주 월요일}. 한 주에 한 번만 (규칙상 고칠 수 없다) */
+  function sendSurvey(week, answer) {
+    if (!enabled()) return Promise.reject(new Error('sync-disabled'));
+    return Auth.signIn().then(function (u) {
+      return withTimeout(db.collection('surveys').doc(u.uid + '_' + week).set({
+        uid: u.uid, week: week, answer: answer,
+        at: firebase.firestore.FieldValue.serverTimestamp(), appVersion: APP_VERSION
+      }), 15000);
+    });
+  }
+
+  return { run: run, start: start, count: count, available: function () { return !!db; },
+           weeklyStats: weeklyStats, sendSurvey: sendSurvey };
 })();

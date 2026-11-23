@@ -130,6 +130,32 @@
     fakeStorage.setItem(NS + 'profile', JSON.stringify(prof));
     fakeStorage.setItem(NS + 'location', JSON.stringify({ lat: 37.5665, lon: 126.9780, name: '서울', precise: false }));
   }
+  /* 지난주 기록(lastweek=1) — 3일 중 2일 목표 채움 · 평균 문서(stats=55) */
+  var lwMon = (function () { var d = new FD(); d.setHours(12, 0, 0, 0); d = new RD(d.getTime() - ((d.getDay() + 6) % 7 + 7) * 86400000); return d; })();
+  var lwKey = function (n) { var d = new RD(lwMon.getTime() + n * 86400000); return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()); };
+  window.__lastWeek = lwKey(0);
+  if (q.get('lastweek') === '1') {
+    fakeStorage.setItem(NS + 'sessions', JSON.stringify([0, 2, 4].map(function (n, i) {
+      return { dateKey: lwKey(n), at: lwMon.getTime() + n * 86400000, minutes: 10, percent: i < 2 ? 100 : 50,
+               clothing: 'shortShort', spf: 1, limitedBy: 'vitd' };
+    })));
+  }
+  /* 지난번에 고른 이유(barrier=forgot) — 2주 전 주에 골랐고, 그 주 기록은 3일 중 1일 채움 */
+  if (q.get('barrier')) {
+    var pf = JSON.parse(fakeStorage.getItem(NS + 'profile') || '{}');
+    pf.barrier = q.get('barrier'); pf.barrierWeek = lwKey(-7);
+    fakeStorage.setItem(NS + 'profile', JSON.stringify(pf));
+    var ss = JSON.parse(fakeStorage.getItem(NS + 'sessions') || '[]');
+    [-7, -5, -3].forEach(function (n, i) {
+      ss.push({ dateKey: lwKey(n), at: lwMon.getTime() + n * 86400000, minutes: 8, percent: i === 0 ? 100 : 40,
+                clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
+    });
+    fakeStorage.setItem(NS + 'sessions', JSON.stringify(ss));
+  }
+  if (q.get('stats')) {
+    window.__fsDocs['stats/latest'] = { week: lwKey(0), n: 8, goalRate: +q.get('stats'), minutes: 40 };
+  }
+
   /* 어제 받아 둔 같은 지역 캐시 — 기상청이 실패하면 이걸로 버틴다 */
   if (P.cache) {
     var hourly = [];

@@ -50,10 +50,12 @@ if (q.get('course')) {
     if (pt === 'light+') cdays[cd].light = true;
     if (pt === 'vitd+') cdaily[cd] = 100;
   }
-  localStorage.setItem(NS + 'course', JSON.stringify({ type: ctype, start: ck(cs), days: cdays }));
+  var call = {}; call[ctype] = { type: ctype, start: ck(cs), days: cdays };
+  localStorage.setItem(NS + 'courses', JSON.stringify(call));
+  localStorage.removeItem(NS + 'course');
   localStorage.setItem(NS + 'courseDaily', JSON.stringify(cdaily));
 } else {
-  localStorage.removeItem(NS + 'course');
+  localStorage.removeItem(NS + 'course'); localStorage.removeItem(NS + 'courses');
 }
 
 var lat = +(q.get('lat') || 37.5665), lon = +(q.get('lon') || 126.9780);

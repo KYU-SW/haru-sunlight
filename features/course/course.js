@@ -1,6 +1,6 @@
 /* =========================================================
    기능: 회복 코스 — 하단 '회복 코스' 탭
-   계산은 core/course.js, 기록은 Repo.getCourse()(기기 저장).
+   계산은 core/course.js, 기록은 Repo.getCourses()(기기 저장) — 두 코스를 같이 할 수 있다.
 
    화면 흐름
      코스 고르기(카드 2장) → 카드를 누르면 그 코스의 소개(왜 8주 / 왜 12주, 애니메이션)
@@ -11,44 +11,58 @@ var CourseService = (function () {
 
   function todayKey() { return Engine.dayKey(new Date()); }
 
-  function get() { return Repo.getCourse(); }
+  /* 하고 있는 코스 — Course.ORDER 순서 (8주 · 12주) */
+  function list() { var all = Repo.getCourses(); return Course.ORDER.filter(function (t) { return all[t] && all[t].start; }); }
+  function get(type) { return Repo.getCourses()[type] || null; }
 
   function start(type) {
-    Repo.setCourse({ type: type || 'daily8', start: todayKey(), days: {} });
+    Repo.setCourseOf(type || 'daily8', { start: todayKey(), days: {} });
     note(App.prescription());
   }
 
-  function stop() { Repo.setCourse(null); }
+  /* type 이 없으면 전부 그만둔다 */
+  function stop(type) {
+    if (type) return Repo.setCourseOf(type, null);
+    Repo.setCourse(null);
+  }
 
-  /* 오늘 미션 종류를 적어 둔다 — 한 번 정해지면 그날은 바꾸지 않는다
+  /* 오늘 미션 종류를 적어 둔다 — 한 번 정해지면 그날은 바꾸지 않는다 (하는 코스 모두)
      (저녁에 예보가 밤 시간만 남아도 낮에 정한 미션이 그대로 남도록) */
   function note(rx) {
-    var c = get();
-    if (!c || !rx) return;
-    var k = rx.dateKey;
-    c.days = c.days || {};
-    if (c.days[k] && c.days[k].kind) return;
+    if (!rx) return;
     var kind = Course.kindFor(rx);
     if (!kind) return;
-    c.days[k] = c.days[k] || {};
-    c.days[k].kind = kind;
-    Repo.setCourse(c);
+    list().forEach(function (t) {
+      var c = get(t), k = rx.dateKey;
+      c.days = c.days || {};
+      if (c.days[k] && c.days[k].kind) return;
+      c.days[k] = c.days[k] || {};
+      c.days[k].kind = kind;
+      Repo.setCourseOf(t, c);
+    });
   }
 
-  /* 겨울 미션 — 낮에 바깥에서 빛을 받고 왔다고 스스로 체크 (Joh 2020의 '햇빛 일지'와 같은 방식) */
+  /* 겨울 미션 — 낮에 바깥에서 빛을 받고 왔다고 스스로 체크 (Joh 2020의 '햇빛 일지'와 같은 방식)
+     하루 할 일은 같은 햇빛이라 하는 코스 모두에 같이 체크한다 */
   function checkLight(on) {
-    var c = get();
-    if (!c) return;
     var k = todayKey();
-    c.days = c.days || {};
-    c.days[k] = c.days[k] || {};
-    c.days[k].light = on !== false;
-    Repo.setCourse(c);
+    list().forEach(function (t) {
+      var c = get(t);
+      c.days = c.days || {};
+      c.days[k] = c.days[k] || {};
+      c.days[k].light = on !== false;
+      Repo.setCourseOf(t, c);
+    });
   }
 
-  function model() { return Course.model(get(), Repo.getDaily(), todayKey()); }
+  /* type 이 없으면 첫 번째로 하는 코스 (없으면 시작 전 모습) */
+  function model(type) {
+    var t = type || list()[0];
+    return Course.model(t ? get(t) : null, Repo.getDaily(), todayKey());
+  }
+  function models() { return list().map(function (t) { return model(t); }); }
 
-  return { start: start, stop: stop, note: note, checkLight: checkLight, model: model };
+  return { start: start, stop: stop, note: note, checkLight: checkLight, model: model, models: models, list: list, get: get };
 })();
 
 
@@ -56,6 +70,8 @@ var CourseView = (function () {
 
   var el;
   var tourType = null, tourStep = 0;     // 소개를 보는 중인 코스 · 몇 번째 장
+  var showType = null;                   // 두 코스를 같이 할 때 지금 보는 코스
+  var picking = false;                   // 코스를 하는 중에 '코스 고르기'로 다시 돌아온 상태
 
   function open() { App.go('course'); }
   function tf(e) { return '<span class="tf">' + e + '</span>'; }
@@ -77,12 +93,14 @@ var CourseView = (function () {
 
   function weekText(m) { return m.type.weekly ? '이번 주 <b>' + m.weekDone + '</b>/' + m.weekGoal + '번' : '이번 주 <b>' + m.weekDone + '</b>/7'; }
 
-  /* ---------- 홈 카드 — 코스를 하는 중일 때만 ---------- */
+  /* ---------- 홈 카드 — 하는 코스마다 하나 ---------- */
   function homeCard() {
-    var m = CourseService.model();
-    if (!m.started) return '';
+    return CourseService.models().map(oneHomeCard).join('');
+  }
+  function oneHomeCard(m) {
+    var id = m.type.id;
     if (m.finished) {
-      return '<button class="ha-t cs-home" id="h-course">' +
+      return '<button class="ha-t cs-home cs-home-go" data-type="' + id + '">' +
         '<div class="cs-home-h"><span class="ha-lab">회복 코스</span>' + UI.ICON.right + '</div>' +
         '<div class="cs-home-t">' + m.type.name + '를 마쳤어요 · <b>결과 보기</b></div>' +
       '</button>';
@@ -90,22 +108,25 @@ var CourseView = (function () {
     var t = m.today, ms = mission(m);
     var canCheck = t.kind === 'light' && t.state !== 'done' && !(m.type.weekly && m.weekMet);
     return '<section class="ha-t cs-home">' +
-      '<button class="cs-home-h" id="h-course"><span class="ha-lab">회복 코스 · ' + m.week + '주차</span>' +
+      '<button class="cs-home-h cs-home-go" data-type="' + id + '"><span class="ha-lab">' + m.type.name + ' · ' + m.week + '주차</span>' +
         '<span class="cs-home-v">' + weekText(m) + UI.ICON.right + '</span></button>' +
       '<div class="cs-home-t' + (t.state === 'done' ? ' done' : '') + '">' + ms.title + '</div>' +
       '<div class="cs-home-b">' + ms.body + '</div>' +
-      (canCheck ? '<button class="ha-cta cs-check" id="h-course-check">다녀왔어요</button>' : '') +
+      (canCheck ? '<button class="ha-cta cs-check cs-home-check">다녀왔어요</button>' : '') +
     '</section>';
   }
 
   function bindHome() {
-    var q = function (id) { return document.getElementById(id); };
-    if (q('h-course')) q('h-course').onclick = open;
-    if (q('h-course-check')) q('h-course-check').onclick = function () {
-      CourseService.checkLight(true);
-      UI.toast('체크했어요. 오늘 할 일 끝!');
-      App.refreshView();
-    };
+    [].forEach.call(document.querySelectorAll('#screen-home .cs-home-go'), function (b) {
+      b.onclick = function () { showType = b.dataset.type; open(); };
+    });
+    [].forEach.call(document.querySelectorAll('#screen-home .cs-home-check'), function (b) {
+      b.onclick = function () {
+        CourseService.checkLight(true);
+        UI.toast('체크했어요. 오늘 할 일 끝!');
+        App.refreshView();
+      };
+    });
   }
 
   /* =========================================================
@@ -256,37 +277,79 @@ var CourseView = (function () {
      ========================================================= */
   function render() {
     App.prescription() && CourseService.note(App.prescription());
-    var m = CourseService.model();
     el = document.getElementById('screen-course');
-    if (!m.started && tourType) {
+    if (tourType) {
       el.innerHTML = tour();
       bindTour();
       return;
     }
+    var on = CourseService.list();
+    if (!on.length) picking = false;
+    if (on.indexOf(showType) < 0) showType = on[0] || null;
+    var m = CourseService.model(showType);
+    var pick = !on.length || picking;
     el.innerHTML =
-      '<div class="an-head cs-head"><div class="an-t">회복 코스</div>' +
-        (m.started && !m.finished ? '<span class="cs-head-d">' + m.dayN + '일째</span>' : '') +
+      '<div class="an-head cs-head">' +
+        (pick && on.length ? '<button class="an-back" id="c-pick-back" aria-label="코스로 돌아가기">' + UI.ICON.back + '</button>' : '') +
+        '<div class="an-t">회복 코스</div>' +
+        
       '</div>' +
       '<div class="ha-wrap">' +
-        (!m.started ? picker() : m.finished ? result(m) : running(m)) +
+        (pick ? picker(on) : curRow(on) + (on.length > 1 ? seg(on) : '') + (m.finished ? result(m) : running(m))) +
       '</div>';
     bind(m);
   }
 
-  /* ---------- 코스 고르기 — 카드 2장 ---------- */
-  function picker() {
-    return '<div class="cs-pick-h">어떤 코스로 해 볼까요?</div>' +
+  /* 맨 위 한 줄 — 지금 하는 코스 + 코스 고르기 */
+  function curRow(on) {
+    var label = on.length > 1 ? '<b>두 코스</b> 하는 중' : '<b>' + Course.TYPES[on[0]].name + '</b> 하는 중';
+    return '<button class="cs-cur" id="c-pick">' + tf(INFO[on[0]].emoji) + '<span class="cs-cur-t">' + label + '</span>' +
+      '<span class="cs-cur-go">코스 고르기' + UI.ICON.right + '</span></button>';
+  }
+
+  /* 두 코스를 같이 할 때 — 맨 위 전환 */
+  function seg(on) {
+    return '<div class="cs-seg">' + on.map(function (t) {
+      return '<button class="cs-seg-b' + (t === showType ? ' on' : '') + '" data-show="' + t + '">' + Course.TYPES[t].name + '</button>';
+    }).join('') + '</div>';
+  }
+
+
+
+  /* ---------- 코스 고르기 — 카드 2장 (추천 코스 카드에 '나에게 추천' 표시 · 이유) ---------- */
+  /* ---------- 코스 추천 — 받은 정보(최근 기록 · 나이)로 둘 중 하나 (core/course.js recommend) ---------- */
+  function recommendation() {
+    var r = Course.recommend(Repo.getProfile(), Repo.getSessions(), Engine.dayKey(new Date()));
+    r.why = r.reason === 'time' ? '지난주에 시간이 없었다고 하셨죠. 요일을 골라 주 3번부터 하는 코스가 맞아요'
+          : r.reason === 'habit' ? '최근 2주 동안 주 평균 ' + r.perWeek + '일 타이머를 썼어요. 매일 하던 대로 이어 가요'
+          : r.reason === 'light' ? '최근 2주 동안 주 평균 ' + r.perWeek + '일 썼어요. 주 3번부터 시작하는 코스가 맞아요'
+          : r.reason === 'age' ? '서울 18~39세가 8주 동안 매일 해서 효과를 본 연구와 같은 나이대예요'
+          : '처음엔 주 3번부터 가볍게 시작하는 코스가 좋아요';
+    return r;
+  }
+
+  /* on — 하는 중인 코스 (카드에 '하는 중' · 누르면 그 코스로) */
+  function picker(on) {
+    on = on || [];
+    var rec = recommendation();
+    return '<div class="cs-pick-h">' + (on.length ? '하나 더 하거나, 하는 코스로 돌아가요' : '어떤 코스로 해 볼까요?') + '</div>' +
+
       Course.ORDER.map(function (id, i) {
         var T = Course.TYPES[id], info = INFO[id];
-        return '<button class="ha-t cs-card" data-type="' + id + '" style="animation-delay:' + (i * 0.08) + 's">' +
+        var doing = on.indexOf(id) >= 0;
+        var isRec = !doing && !on.length && rec.type === id;
+        return '<button class="ha-t cs-card' + (isRec ? ' rec' : '') + (doing ? ' doing' : '') + '" data-type="' + id + '" style="animation-delay:' + (i * 0.08) + 's">' +
           '<div class="cs-card-top"><span class="cs-card-e">' + tf(info.emoji) + '</span>' +
+            (isRec ? '<span class="cs-card-rec">나에게 추천</span>' : '') +
+            (doing ? '<span class="cs-card-rec doing">하는 중</span>' : '') +
             '<span class="cs-card-len"><b>' + T.weeks + '</b>주</span></div>' +
           '<div class="cs-card-n">' + T.name + '</div>' +
           '<div class="cs-card-p">' + info.pitch + '</div>' +
           '<div class="cs-card-tags">' + info.tags.map(function (g) { return '<span>' + g + '</span>'; }).join('') + '</div>' +
-          '<div class="cs-card-go">왜 ' + T.weeks + '주인지 보기' + UI.ICON.right + '</div>' +
+          '<div class="cs-card-go">' + (doing ? '이 코스로 가기' : '왜 ' + T.weeks + '주인지 보기') + UI.ICON.right + '</div>' +
         '</button>';
-      }).join('');
+      }).join('') +
+      (on.length ? '<div class="cs-pick-n">두 코스를 같이 해도 하루 할 일은 한 번에 같이 체크돼요</div>' : '');
   }
 
   /* ---------- 코스별 소개 (애니메이션) ---------- */
@@ -335,8 +398,10 @@ var CourseView = (function () {
     if (q('c-ob-start')) q('c-ob-start').onclick = function () {
       var t = tourType;
       tourType = null; tourStep = 0;
+      var both = CourseService.list().length > 0;
       CourseService.start(t);
-      UI.toast('시작! 오늘이 1일째예요');
+      showType = t; picking = false;
+      UI.toast(both ? '두 코스를 같이 해요 · 하루 할 일은 한 번에 체크돼요' : '시작! 오늘이 1일째예요');
       render();
     };
     /* 하단 탭은 그대로 보이게 — 소개 화면은 탭 바로 위까지만 */
@@ -355,16 +420,15 @@ var CourseView = (function () {
   }
 
   /* ---------- 진행 중 ---------- */
-  function running(m) {
+  function running(m, extra) {
     var t = m.today, ms = mission(m), done = t.state === 'done';
     var free = m.type.weekly && m.weekMet && !done;
     var canCheck = t.kind === 'light' && !done && !free;
-    var undo = t.kind === 'light' && done && ((Repo.getCourse().days || {})[t.key] || {}).light;
+    var undo = t.kind === 'light' && done && (((CourseService.get(m.type.id) || {}).days || {})[t.key] || {}).light;
     var cta = canCheck ? '<button class="ha-cta cs-start" id="c-check">다녀왔어요</button>'
       : t.kind === 'vitd' && !done && !free ? '<button class="ha-cta cs-start" id="c-home">처방 보러 가기</button>' : '';
     return '<section class="ha-t cs-hero' + (done ? ' done' : '') + '">' +
-        '<div class="cs-hero-h"><span class="ha-lab">오늘 할 일</span>' +
-          '<span class="cs-chip">' + m.type.name + '</span></div>' +
+        '<div class="cs-hero-h"><span class="ha-lab">오늘 할 일</span></div>' +
         '<div class="cs-title lg' + (done || free ? ' done' : '') + '">' + (done ? StampView.mark() + ' ' : '') + ms.title + '</div>' +
         '<div class="cs-desc">' + ms.body + '</div>' +
         cta +
@@ -376,6 +440,7 @@ var CourseView = (function () {
         '<div><div class="ha-lab">달성률</div><b>' + (m.total.percent == null ? '–' : m.total.percent + '<small>%</small>') + '</b></div>' +
       '</section>' +
       grid(m) +
+      (extra || '') +
       '<button class="cs-link cs-why" id="c-why">왜 ' + m.weeks + '주예요? · 근거 보기</button>' +
       '<button class="cs-link" id="c-stop">코스 그만두기</button>';
   }
@@ -440,11 +505,19 @@ var CourseView = (function () {
   function bind(m) {
     var q = function (id) { return document.getElementById(id); };
     [].forEach.call(el.querySelectorAll('.cs-card'), function (b) {
-      b.onclick = function () { tourType = b.dataset.type; tourStep = 0; render(); };
+      b.onclick = function () {
+        if (b.classList.contains('doing')) { showType = b.dataset.type; picking = false; return render(); }
+        tourType = b.dataset.type; tourStep = 0; render();
+      };
+    });
+    if (q('c-pick')) q('c-pick').onclick = function () { picking = true; render(); };
+    if (q('c-pick-back')) q('c-pick-back').onclick = function () { picking = false; render(); };
+    [].forEach.call(el.querySelectorAll('.cs-seg-b'), function (b) {
+      b.onclick = function () { showType = b.dataset.show; render(); };
     });
     if (q('c-why')) q('c-why').onclick = function () { showEvidence(m.type.id); };
     if (q('c-home')) q('c-home').onclick = function () { App.go('home'); };
-    if (q('c-restart')) q('c-restart').onclick = function () { CourseService.stop(); render(); };
+    if (q('c-restart')) q('c-restart').onclick = function () { CourseService.stop(m.type.id); render(); };
     if (q('c-check')) q('c-check').onclick = function () {
       CourseService.checkLight(true);
       UI.toast('체크했어요. 오늘 할 일 끝!');
@@ -455,12 +528,12 @@ var CourseView = (function () {
       render();
     };
     if (q('c-stop')) q('c-stop').onclick = function () {
-      UI.sheet('코스 그만할까요?', '지금까지 한 기록이 다 지워져요',
+      UI.sheet(m.type.name + ' 그만할까요?', '이 코스에서 한 기록이 다 지워져요',
         '<div class="btn-row"><button class="btn btn-sub" id="c-stop-no">계속할게요</button>' +
         '<button class="btn btn-primary" id="c-stop-yes">그만할래요</button></div>');
       q('c-stop-no').onclick = function () { UI.closeSheet(); };
       q('c-stop-yes').onclick = function () {
-        CourseService.stop();
+        CourseService.stop(m.type.id);
         UI.closeSheet();
         UI.toast('코스를 그만뒀어요');
         render();

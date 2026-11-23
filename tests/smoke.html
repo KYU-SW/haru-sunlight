@@ -11,6 +11,7 @@
 <script src="../core/providers/kma.provider.js"></script>
 <script src="../core/weather.api.js"></script>
 <script src="../core/course.js"></script>
+<script src="../core/report.js"></script>
 <script src="../shared/ui.js"></script>
 <script src="../core/prescription.js"></script>
 <script src="../shared/chart.js"></script>
@@ -346,6 +347,30 @@ ok('시작 안 했으면 started = false', Course.model(null, {}, '2026-11-06').
 ok('기온별 옷차림 — 23℃↑ 반팔반바지 · 20~22℃ 반팔긴바지 · 20℃ 미만 긴팔긴바지',
    Engine.clothingForTemp(23) === 'shortShort' && Engine.clothingForTemp(22) === 'shortLong' &&
    Engine.clothingForTemp(20) === 'shortLong' && Engine.clothingForTemp(19.9) === 'longLong' && Engine.clothingForTemp(null) === null);
+var recS = function (n) { var a = []; for (var i = 0; i < n; i++) a.push({ dateKey: Course.addKey('2026-11-23', -i) }); return a; };
+ok('코스 추천 — 최근 2주 주 5일 이상 → 8주 · 그 아래 → 12주',
+   Course.recommend({ age: 50 }, recS(10), '2026-11-23').type === 'daily8' && Course.recommend({ age: 22 }, recS(6), '2026-11-23').type === 'load12' &&
+   Course.recommend({}, recS(6), '2026-11-23').perWeek === 3);
+ok('코스 추천 — 기록이 없으면 18~39세 → 8주 · 그 밖 · 모름 → 12주',
+   Course.recommend({ age: 22 }, [], '2026-11-23').type === 'daily8' && Course.recommend({ age: 45 }, [], '2026-11-23').type === 'load12' &&
+   Course.recommend({ age: null }, [{ dateKey: '2026-10-01' }], '2026-11-23').reason === 'start');
+/* 지난주 돌아보기 (core/report.js) */
+var rw = Report.lastWeek('2026-11-25');   // 수요일 → 지난주는 11-16(월) ~ 11-22(일)
+ok('지난주 = 그 전 주 월~일', rw.week === '2026-11-16' && rw.end === '2026-11-22' && Report.monday('2026-11-22') === '2026-11-16');
+var rs = [ { uid: 'a', dateKey: '2026-11-16', percent: 60, minutes: 5 }, { uid: 'a', dateKey: '2026-11-16', percent: 50, minutes: 4 },
+           { uid: 'a', dateKey: '2026-11-18', percent: 40, minutes: 3 }, { uid: 'a', dateKey: '2026-11-23', percent: 100, minutes: 9 },
+           { uid: 'b', dateKey: '2026-11-20', percent: 100, minutes: 10 }, { uid: 'c', dateKey: '2026-11-10', percent: 100, minutes: 8 } ];
+var rmA = Report.mine(rs.filter(function (s) { return s.uid === 'a'; }), rw);
+ok('내 지난주 — 같은 날 기록은 합쳐서 100% 이상이면 채운 날 (2일 중 1일 · 50% · 12분)',
+   rmA.days === 2 && rmA.goalDays === 1 && rmA.goalRate === 50 && rmA.minutes === 12);
+ok('지난주에 쓴 날이 없으면 null', Report.mine([{ dateKey: '2026-11-10', percent: 100, minutes: 5 }], rw) === null);
+var rsum = Report.summarize(rs, rw);
+ok('평균 — 지난주에 쓴 사람만 (a 50% · b 100% → 2명 · 75% · 11분)', rsum.n === 2 && rsum.goalRate === 75 && rsum.minutes === 11);
+ok('비교 — 3명 미만이면 보여 주지 않는다', Report.compare(rmA, rsum) === null);
+ok('비교 — 3명 이상 · 같은 주면 차이(%p)', Report.compare(rmA, { week: '2026-11-16', n: 5, goalRate: 40, minutes: 20 }).diff === 10 &&
+   Report.compare(rmA, { week: '2026-11-09', n: 5, goalRate: 40, minutes: 20 }) === null);
+ok('코스 추천 — 지난번 이유가 "시간이 없어서"면 기록과 상관없이 12주', Course.recommend({ age: 22, barrier: 'time' }, recS(10), '2026-11-23').type === 'load12' &&
+   Course.recommend({ age: 22, barrier: 'time' }, [], '2026-11-23').reason === 'time');
 ok('type 없는 예전 기록은 8주 매일 코스', Course.typeOf({ start: cStart }).id === 'daily8' && cm.type.id === 'daily8');
 
 /* 12주 채우고 유지 — 처음 4주 주 3번, 다음 8주 주 1번 */

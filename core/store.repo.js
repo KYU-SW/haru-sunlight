@@ -19,6 +19,8 @@ var Repo = (function () {
     useCircadian: true,
     supplement: false,    // §5 합산 상한 경고용
     notify: false,
+    barrier: null,        // 햇빛을 못 쬔 가장 큰 이유 — 'time' · 'forgot' · 'weather' · 'burn' · 'lazy' (지난주 돌아보기에서 고름)
+    barrierWeek: null,    // 그 이유를 고른 주(월요일) — 다음 주 팝업에서 그 뒤로 얼마나 바뀌었는지 보여 준다
     autoCloth: false,     // 켜면 그날 낮 최고 기온으로 옷차림을 하루 한 번 맞춘다 (Engine.clothingForTemp)
     autoClothDay: null,   // 마지막으로 맞춘 날 — 같은 날 직접 바꾼 옷차림은 덮어쓰지 않는다
     consent: null         // 기록 수집 동의 {agreed, version, at} — 답하기 전엔 null
@@ -95,15 +97,30 @@ var Repo = (function () {
   function setTimer(o) { write('timer', o); }
   function clearTimer() { try { localStorage.removeItem(NS + 'timer'); } catch (e) {} }
 
-  /* 회복 코스 {start:'2026-11-21', days:{'2026-11-21':{kind:'light', light:true}}} (core/course.js) */
-  function getCourse() { return read('course', null); }
+  /* 회복 코스 — 두 코스를 같이 할 수 있다: courses = { daily8: {type,start,days}, load12: {...} } (core/course.js)
+     예전 한 개짜리 'course' 기록은 처음 읽을 때 courses 로 옮긴다 */
+  function getCourses() {
+    var all = read('courses', null);
+    if (all) return all;
+    var old = read('course', null);
+    return old && old.start ? (function () { var o = {}; o[old.type || 'daily8'] = old; return o; })() : {};
+  }
+  function setCourseOf(type, c) {
+    var all = getCourses();
+    if (c) { c.type = type; all[type] = c; } else delete all[type];
+    write('courses', all);
+    try { localStorage.removeItem(NS + 'course'); } catch (e) {}
+  }
+  /* 예전 이름 — 하나만 다루던 코드용: 첫 번째 코스 / 전부 지우기 */
+  function getCourse() { var all = getCourses(); var k = Object.keys(all)[0]; return k ? all[k] : null; }
   function setCourse(c) {
-    if (c) write('course', c);
-    else { try { localStorage.removeItem(NS + 'course'); } catch (e) {} }
+    if (c) return setCourseOf(c.type || 'daily8', c);
+    write('courses', {});
+    try { localStorage.removeItem(NS + 'course'); } catch (e) {}
   }
 
   function reset() {
-    ['profile', 'location', 'daily', 'load', 'sessions', 'weather', 'timer', 'course'].forEach(function (k) {
+    ['profile', 'location', 'daily', 'load', 'sessions', 'weather', 'timer', 'course', 'courses'].forEach(function (k) {
       try { localStorage.removeItem(NS + k); } catch (e) {}
     });
   }
@@ -116,7 +133,7 @@ var Repo = (function () {
     getSessions: getSessions, addSession: addSession,
     getWeatherCache: getWeatherCache, setWeatherCache: setWeatherCache,
     getTimer: getTimer, setTimer: setTimer, clearTimer: clearTimer,
-    getCourse: getCourse, setCourse: setCourse,
+    getCourse: getCourse, setCourse: setCourse, getCourses: getCourses, setCourseOf: setCourseOf,
     reset: reset
   };
 })();

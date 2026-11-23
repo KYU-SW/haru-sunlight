@@ -80,6 +80,23 @@ var AdminView = (function () {
     return '로그인하지 못했어요 (' + c + ')';
   }
 
+  /* 지난주 평균을 앱에 알려 준다 — 숫자 셋(인원 · 목표 채운 비율 · 쬔 시간)만 stats/latest 에.
+     앱은 남의 기록을 읽을 수 없으므로(firestore.rules) 관리자가 대시보드를 열 때 갱신한다 */
+  function publishWeekly() {
+    if (!db || !auth || !auth.currentUser || typeof Report === 'undefined') return;
+    var r = Report.lastWeek(AdminStats.todayKey ? AdminStats.todayKey() : todayKeyLocal());
+    var s = Report.summarize(state.sessions, r);
+    if (!s.n) return;
+    db.collection('stats').doc('latest').set({
+      week: s.week, n: s.n, goalRate: s.goalRate, minutes: s.minutes,
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(), by: auth.currentUser.uid
+    }).catch(function (e) { console.warn('[관리자] 주간 평균 올리기 건너뜀', (e && e.code) || e); });
+  }
+  function todayKeyLocal() {
+    var d = new Date(), p = function (n) { return n < 10 ? '0' + n : '' + n; };
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate());
+  }
+
   function fetchLive() {
     state.loading = true; render();
     /* 변경 내역은 규칙을 새로 게시하기 전이면 못 읽는다 — 그래도 나머지는 보여 준다 */
@@ -90,7 +107,11 @@ var AdminView = (function () {
     var offline = db.collection('offline').get()
       .then(function (q) { return q.docs.map(function (d) { var x = d.data(); x.id = d.id; return x; }); })
       .catch(function () { return null; });
-    return Promise.all([db.collection('users').get(), db.collection('sessions').get(), logs, offline])
+    /* 주간 설문도 규칙을 새로 게시하기 전이면 못 읽는다 */
+    var surveys = db.collection('surveys').get()
+      .then(function (q) { return q.docs.map(function (d) { return d.data(); }); })
+      .catch(function () { return null; });
+    return Promise.all([db.collection('users').get(), db.collection('sessions').get(), logs, offline, surveys])
       .then(function (r) {
         /* 지금 로그인한 관리자 계정의 문서는 참가자에서 뺀다 (관리자가 앱에서 동의·타이머를 눌러도 섞이지 않게) */
         var me = auth.currentUser ? auth.currentUser.uid : null;
@@ -102,7 +123,9 @@ var AdminView = (function () {
         state.offlineErr = r[3] === null;
         try { state.offline = r[3] && r[3].length ? AdminOffline.parse(JSON.stringify(r[3])) : null; }
         catch (e) { state.offline = null; state.offlineErr = true; }
+        state.surveys = r[4];
         state.mode = 'live'; state.loading = false; state.error = null;
+        publishWeekly();
         render();
       })
       .catch(function (e) {
@@ -328,6 +351,32 @@ var AdminView = (function () {
     return w[w.length - 1].mean / w[0].mean - 1;
   }
 
+  /* 못 쬔 이유 설문 (타이머 끝난 뒤 '지난주 돌아보기') — 가장 최근 주 이유별 응답 + 이유를 답한 다음 주 변화 */
+  function surveyTile() {
+    var list = state.surveys;
+    if (!list || !list.length || typeof Report === 'undefined') return null;
+    var NAME = { time: '시간', forgot: '깜빡', weather: '날씨', burn: '탈까 봐', lazy: '귀찮아서', none: '없음' };
+    var week = list.map(function (s) { return s.week; }).sort().pop();
+    var c = {}, n = 0;
+    list.forEach(function (s) { if (s.week === week && NAME[s.answer]) { c[s.answer] = (c[s.answer] || 0) + 1; n++; } });
+    var top = Object.keys(c).sort(function (x, y) { return c[y] - c[x]; });
+    /* 답한 주(W) → 다음 주(W+7) 하루 목표 채운 비율 변화 — 두 주 모두 기록이 있는 사람만 */
+    var diffs = [];
+    list.forEach(function (s) {
+      if (!s.uid || s.answer === 'none') return;
+      var mine = (state.sessions || []).filter(function (x) { return x.uid === s.uid; });
+      var a = Report.mine(mine, { week: s.week, start: s.week, end: Report.addDays(s.week, 6) });
+      var nx = Report.addDays(s.week, 7);
+      var b = Report.mine(mine, { week: nx, start: nx, end: Report.addDays(nx, 6) });
+      if (a && b) diffs.push(b.goalRate - a.goalRate);
+    });
+    var avg = diffs.length ? Math.round(diffs.reduce(function (x, y) { return x + y; }, 0) / diffs.length) : null;
+    return { lab: '햇빛을 못 쬔 가장 큰 이유 (설문)',
+             val: top.length ? '<b>' + NAME[top[0]] + '</b> ' + Math.round(c[top[0]] / n * 100) + '%' : '—',
+             sub: week + ' 주 · 응답 ' + n + '명 · ' + top.map(function (k) { return NAME[k] + ' ' + c[k]; }).join(' · ') +
+                  (avg === null ? '' : ' · 답한 다음 주 목표 채운 비율 ' + (avg >= 0 ? '+' : '') + avg + '%p (' + diffs.length + '명)') };
+  }
+
   function summaryHtml(x) {
     var rec = x.rec, c = x.c, w = rec.weekly, m = combined(rec), off = m.off;
     var g = growth(rec);
@@ -349,6 +398,8 @@ var AdminView = (function () {
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
       { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표를 100% 채운 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
     );
+    var sv = surveyTile();
+    if (sv) tiles.push(sv);
     return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-tiles">' + tiles.map(function (t) {
         return '<div class="ad-tile"><span class="ad-lab">' + t.lab + '</span><div class="ad-big">' + t.val + '</div>' +

@@ -310,6 +310,8 @@ var TimerView = (function () {
     rx = App.prescription() || rx;
     if (rx) paint();
     if (App.state && App.state.tab !== 'timer') App.refreshView();   // 홈에 있었다면 오늘 충전률을 바로 반영
+    /* 일주일에 한 번 — 타이머가 끝난 뒤 '지난주 돌아보기' (features/report/report.js) */
+    if (out && window.ReportView) setTimeout(ReportView.afterTimer, 1200);
   }
 
   return { render: render, stopLoop: stopLoop, ensureLoop: ensureLoop };

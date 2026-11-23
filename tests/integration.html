@@ -197,6 +197,91 @@ var SCENARIOS = [
     });
   }],
 
+  ['11. 지난주 돌아보기 — 타이머 끝나면 가운데 팝업 · 평균 vs 나 · 못 쬔 이유 → 앱이 바뀜', 'lastweek=1&stats=55', function (w) {
+    var rx;
+    return loaded(w).then(function () {
+      ok('홈에는 지난주 카드가 없다 (타이머 끝날 때만)', !w.document.getElementById('h-report'));
+      rx = w.App.prescription();
+      w.TimerService.start(rx, rx.windows[0]);
+      w.App.startTimer();
+      return sleep(300);
+    }).then(function () {
+      var stop = w.document.getElementById('t-stop');
+      ok('타이머 화면이 열린다', !!stop);
+      if (stop) stop.click();     // '그만할래요' — 타이머가 끝난다
+      return until(function () { return w.document.getElementById('rp-modal') && w.document.getElementById('rp-modal').classList.contains('show'); }, 6000);
+    }).then(function () {
+      var t = txt(w, '#h-report');
+      ok('가운데 팝업 — "다른 사람들은 평균 55% 채웠는데, 나는 67% 채웠어요"', /다른 사람들은 평균\s*55%\s*채웠는데,\s*나는\s*67%\s*채웠어요/.test(t), t.slice(0, 60));
+      ok('질문 — 못 쬔 이유 5가지', w.document.querySelectorAll('#h-report .rp-b').length === 5 && /가장 큰 이유/.test(t));
+      w.document.querySelector('#h-report .rp-b[data-a="forgot"]').click();
+      return until(function () { return w.__fsWrites.some(function (x) { return /^surveys\//.test(x.path); }) && w.document.getElementById('rp-later'); }, 5000);
+    }).then(function () {
+      var sv = w.__fsWrites.filter(function (x) { return /^surveys\//.test(x.path); })[0];
+      ok('답이 surveys/{uid}_{지난주 월요일} 로 올라간다 (answer=forgot)', sv.path === 'surveys/test-uid-0001_' + w.__lastWeek && sv.data.answer === 'forgot', sv.path);
+      ok('설문 문서 — 규칙이 허용한 칸만', Object.keys(sv.data).sort().join(',') === 'answer,appVersion,at,uid,week', Object.keys(sv.data).sort().join(','));
+      var p = w.Repo.getProfile();
+      ok('깜빡해서 → 기기에 이유 저장 · 알림 켜기 버튼', p.barrier === 'forgot' && p.barrierWeek === w.__lastWeek && /알림 켜기/.test(txt(w, '#rp-go')));
+      w.document.getElementById('rp-later').click();
+      return w.ReportView.afterTimer();
+    }).then(function (again) {
+      ok('닫히고, 같은 주에 타이머를 또 끝내도 다시 안 뜬다', !w.document.getElementById('rp-modal').classList.contains('show') && again === false);
+      w.Repo.setProfile({ barrier: 'burn' }); w.App.invalidate(); w.App.go('home');
+      ok('탈까 봐 걱정돼서 → 홈 처방에 "피부가 빨개지기까지 약 N분"', /빨개지기까지 약 \d+분/.test(txt(w, '#screen-home .ha-sub')), txt(w, '#screen-home .ha-sub'));
+      w.Repo.setProfile({ barrier: 'time' }); w.App.go('course');
+      ok('시간이 없어서 → 12주 코스 카드에 추천', (w.document.querySelector('#screen-course .cs-card.rec') || {}).dataset.type === 'load12');
+    });
+  }],
+
+  ['12. 지난주 돌아보기 — 지난번 이유 뒤로 얼마나 바뀌었는지 · 평균이 없으면 내 기록만', 'lastweek=1&barrier=forgot', function (w) {
+    return loaded(w).then(function () { return w.ReportView.afterTimer(); }).then(function (shown) {
+      var t = txt(w, '#h-report');
+      ok('팝업은 뜨고 내 기록만 (비교 문장 없음)', shown === true && /3일 중 2일/.test(t) && !/다른 사람들은 평균/.test(t));
+      ok('"지난번엔 \'깜빡해서\'라고 하셨죠. 그 뒤로 33% → 67% 늘었어요"', /깜빡해서.*그 뒤로 33% → 67% 늘었어요/.test(t), t.slice(0, 90));
+      w.document.getElementById('h-report-x').click();
+      return w.ReportView.afterTimer();
+    }).then(function (again) {
+      ok('닫아도 그 주엔 다시 안 뜬다', again === false);
+    });
+  }],
+
+  ['13. 회복 코스 — 겨울날 인사말 · 추천 코스 카드에 표시', 'uvi=1.5&temp=4', function (w) {
+    return loaded(w).then(function () {
+      w.Repo.setProfile({ barrier: 'weather' }); w.App.go('home');
+      ok('날씨가 안 좋아서 → 햇빛 시간 없는 날 인사말이 "바깥 빛 20~30분으로 대신해요"', /바깥 빛\s*20~30분으로\s*대신해요/.test(txt(w, '#screen-home .ha-greet')));
+      w.Repo.setProfile({ barrier: null });
+      var g0 = txt(w, '#screen-home .ha-greet');
+      w.CourseService.start('daily8'); w.App.go('home');
+      var g1 = txt(w, '#screen-home .ha-greet');
+      ok('코스 중인 겨울날엔 인사말이 바깥 빛 쪽으로 바뀐다', /바깥 빛|습관|밝은 빛/.test(g1) && !/쉬어 가는 날/.test(g1), g0 + ' → ' + g1);
+      w.CourseService.stop(); w.App.go('course');
+      var rec = w.document.querySelector('#screen-course .cs-card.rec');
+      ok('따로 칸 없이 추천 코스 카드에 "나에게 추천"만 (22세 · 기록 없음 → 8주)', !!rec && rec.dataset.type === 'daily8' &&
+         w.document.querySelectorAll('#screen-course .cs-card.rec').length === 1 && /나에게 추천/.test(rec.textContent) && !rec.querySelector('.cs-card-why') &&
+         !w.document.getElementById('c-rec'));
+      rec.click();
+      ok('누르면 그 코스 소개가 열린다', /8주 매일 코스/.test(txt(w, '#c-ob')));
+      /* 두 코스를 같이 */
+      w.document.getElementById('c-ob-skip').click();
+      w.document.getElementById('c-ob-start').click();
+      ok('코스를 하는 중엔 위에 "코스 고르기" 버튼', !!w.document.getElementById('c-pick') && !w.document.querySelector('#screen-course .cs-add'));
+      w.document.getElementById('c-pick').click();
+      var doing = w.document.querySelector('#screen-course .cs-card.doing');
+      ok('코스 고르기로 돌아가면 하는 코스에 "하는 중"', !!doing && doing.dataset.type === 'daily8' && /하는 중/.test(doing.textContent));
+      w.document.querySelector('#screen-course .cs-card[data-type="load12"]').click();
+      w.document.getElementById('c-ob-skip').click(); w.document.getElementById('c-ob-start').click();
+      ok('두 코스를 같이 — 맨 위 전환 버튼 2개 · 지금은 12주', w.CourseService.list().join(',') === 'daily8,load12' &&
+         w.document.querySelectorAll('#screen-course .cs-seg-b').length === 2 && /12주 채우고 유지 코스/.test(txt(w, '#screen-course .cs-seg-b.on')));
+      w.document.getElementById('c-check').click();
+      ok('"다녀왔어요" 한 번이면 두 코스 모두 오늘 칸이 채움', w.CourseService.model('daily8').today.state === 'done' && w.CourseService.model('load12').today.state === 'done');
+      w.App.go('home');
+      ok('홈에 코스 카드 2장', w.document.querySelectorAll('#screen-home .cs-home').length === 2);
+      w.App.go('course'); w.document.querySelector('#screen-course .cs-seg-b[data-show="daily8"]').click();
+      w.document.getElementById('c-stop').click(); w.document.getElementById('c-stop-yes').click();
+      ok('하나만 그만두면 다른 코스는 그대로', w.CourseService.list().join(',') === 'load12');
+    });
+  }],
+
   ['10. 수집 동의를 안 한 사람', 'state=noconsent', function (w) {
     return sleep(400).then(function () {
       ok('동의 화면이 먼저 뜬다', w.document.getElementById('onboarding').classList.contains('show') && /시작하기 전에/.test(txt(w, '#onboarding')));

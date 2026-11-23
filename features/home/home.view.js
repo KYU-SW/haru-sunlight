@@ -72,10 +72,38 @@ var HomeView = (function () {
     '<em>내일</em> 다시 만나요'
   ];
 
+  /* 회복 코스를 하는 중인 겨울날 — '쉬어 가는 날'이라고 하면 아래 코스 카드('바깥 빛 20~30분')와 어긋난다 */
+  var GREET_COURSE_LIGHT = [
+    '오늘은 <em>바깥 빛</em>으로<br>이어 가요',
+    '비타민D는 쉬어도<br><em>습관</em>은 이어 가요',
+    '잠깐 나가서<br><em>밝은 빛</em> 받고 와요'
+  ];
+  var GREET_COURSE_DONE = ['오늘 할 일 <em>끝!</em><br>내일 또 봐요'];
+
+  /* '날씨가 안 좋아서'라고 한 사람 — 햇빛 시간이 없는 날엔 대신할 일을 말해 준다 */
+  var GREET_BARRIER_WEATHER = ['오늘은 <em>바깥 빛</em> 20~30분으로<br>대신해요'];
+
+  function coursePool(m) {
+    if (m.hero.state === 'closed' && Repo.getProfile().barrier === 'weather' &&
+        !(window.CourseService && CourseService.model().started)) return GREET_BARRIER_WEATHER;
+    if (!window.CourseService || m.hero.state !== 'closed') return null;
+    var c = CourseService.models().filter(function (x) { return !x.finished && x.today && x.today.kind === 'light'; })[0];
+    if (!c) return null;
+    return c.today.state === 'done' ? GREET_COURSE_DONE : GREET_COURSE_LIGHT;
+  }
+
+  /* '탈까 봐 걱정돼서'라고 한 사람 — 처방이 화상 한계보다 얼마나 짧은지 보여 준다 */
+  function burnNote(m) {
+    if (Repo.getProfile().barrier !== 'burn' || !m.rx) return '';
+    var w = m.rx.targetWindow, p = (w && w.best) || m.rx.nowPoint;
+    if (!p || !isFinite(p.burn)) return '';
+    return '<br>피부가 빨개지기까지 약 <b>' + Math.round(p.burn) + '분</b> — 처방은 그보다 짧아요';
+  }
+
   function greeting(m) {
     var d = m.rx.date;
     var day = Math.floor(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / 86400000);
-    var pool = m.hero.state === 'closed' ? GREET_CLOSED : GREET_OPEN;
+    var pool = coursePool(m) || (m.hero.state === 'closed' ? GREET_CLOSED : GREET_OPEN);
     return '<div class="ha-greet">' + pool[day % pool.length] + '</div>';
   }
 
@@ -83,9 +111,9 @@ var HomeView = (function () {
   function heroTile(m) {
     var h = m.hero, big, sub, art;
     if (h.state === 'open') {
-      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · 지금 나가면 좋아요'; art = '☀️';
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · 지금 나가면 좋아요' + burnNote(m); art = '☀️';
     } else if (h.state === 'waiting') {
-      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · ' + h.kicker + ' 시작'; art = '🌤️';
+      big = h.when; sub = '권장 <b>' + h.minutes + '분</b> · ' + h.kicker + ' 시작' + burnNote(m); art = '🌤️';
     } else {
       big = h.headline; sub = h.when; art = h.passed ? '🌇' : '🌧️';
     }
