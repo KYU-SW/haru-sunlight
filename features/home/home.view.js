@@ -13,6 +13,7 @@ var HomeView = (function () {
   var el;
 
   function render(m) {
+    if (window.CourseService) CourseService.note(m.rx);     // 회복 코스 — 오늘 미션 종류를 적어 둔다
     el = document.getElementById('screen-home');
     el.innerHTML =
       head(m) +
@@ -20,6 +21,7 @@ var HomeView = (function () {
         (m.stale ? '<div class="stale" style="margin:0">⚠️ 네트워크 연결이 안 돼 저장된 예보로 계산했어요</div>' : '') +
         greeting(m) +
         heroTile(m) +
+        (window.CourseView ? CourseView.homeCard() : '') +
         miniTiles(m) +
         (m.windows.length > 1 ? slotsCard(m) : '') +
       '</div>';
@@ -190,6 +192,7 @@ var HomeView = (function () {
     };
 
     if (q('h-bell')) q('h-bell').onclick = function () { App.enableNotify(); };
+    if (window.CourseView) CourseView.bindHome();
     if (q('h-go-weekly')) q('h-go-weekly').onclick = function () { WeeklyView.open('analysis'); };
 
     if (q('h-cta')) q('h-cta').onclick = function () {

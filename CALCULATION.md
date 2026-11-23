@@ -190,3 +190,62 @@ v_0.5(k = 0.25, 우리 보정)는 같은 조건에서 7.1분이었습니다.
 
 - [x] v_0.6 — 최신 논문 식으로 교체 (Sánchez-Pérez 2024 · 고용노동부 2026 · Diffey 2018), 나이 · 비만 보정 제거 — `tests/smoke.html` 88개 통과
 - [ ] 미세먼지 (에어코리아 API 키 발급 후)
+
+---
+
+## 10. 회복 코스 (8주 · 12주) 근거
+
+`core/course.js` · `features/course/course.js`. 하단 '회복 코스' 탭에서 코스 2개 중 하나를 고른다.
+카드를 누르면 그 코스의 소개(왜 이 기간인지)가 나오고, 마지막 장에서 시작한다.
+
+| 코스 | 하는 날 | 기간 | 핵심 근거 |
+|---|---|---|---|
+| 8주 매일 코스 | 매일 | 8주 (56일) | [C1] Joh 2020 · [C2] Singh 2024 · [C6] Lee 2020 |
+| 12주 채우고 유지 코스 | 1~4주는 주 3번, 5~12주는 주 1번 (요일 자유) | 12주 (84일) | [C7] Carswell 2018 · [C6] Lee 2020 |
+
+하는 날의 할 일은 두 코스 모두 날씨에 맞춰 정한다.
+
+| 그날 날씨 | 할 일 | 채운 것으로 치는 기준 |
+|---|---|---|
+| 햇빛 시간이 있는 날 | 앱 처방 시간 다 채우기 | 그날 충전률 100% 이상 (스탬프와 같은 기준) |
+| 겨울 모드 (최고 자외선지수 < 2) | 낮에 바깥에서 20~30분 빛 받기 | 사용자가 '다녀왔어요'로 체크 (햇빛 일지 방식) |
+| 흐림 · 장마 · 폭염으로 햇빛 시간이 없는 날 | 쉬는 날 | 달성률 계산에서 뺀다 (그날 처방을 채우면 채움으로 인정) |
+
+- 그날 할 일은 낮 예보를 받은 처음 한 번 정하고, 그날 안에는 바꾸지 않는다. 저녁에는 예보가 밤 시간만 남아 판정할 수 없기 때문이다.
+- 8주 코스 달성률 = 채운 날 ÷ (채운 날 + 못 채운 날). 오늘(아직 진행 중) · 앞으로 올 날 · 쉬는 날은 뺀다.
+- 12주 코스 달성률 = 주마다 채운 횟수(그 주 목표까지만) 합 ÷ 주 목표 합. 끝난 주와 이미 목표를 채운 이번 주만 센다.
+  안 한 날은 '못 채움'이 아니다 (요일은 자유).
+- 코스가 끝나면 **첫 2주 vs 마지막 2주** 달성률을 비교해 보여 준다 (평가 계획의 '첫 주 vs 마지막 주' 비교와 같은 방식).
+- 기록은 기기에만 저장한다 (서버로 보내지 않음).
+
+### 왜 8주 · 12주인가
+
+| 근거 | 내용 | 코스에 쓴 곳 |
+|---|---|---|
+| [C1] Joh 외 2020 (국내 무작위 대조시험) | 서울(37°N) 18~39세 비타민D 부족(12 ng/mL 미만) 성인 150명. **8주** 동안 햇빛 그룹(매일 정오 무렵 20~30분 + 햇빛 일지) · 비타민D 500 IU · 가짜약 비교. 햇빛 그룹도 가짜약보다 25(OH)D가 의미 있게 올랐다(+2.2 ng/mL, 95% CI 0.2~4.2). 다만 **햇빛 지키기를 잘 한 사람이 적었고, 잘 지킨 사람만 의미 있게 올랐다.** | 코스 길이(8주) · 시간(20~30분) · 체크 방식(일지). **꾸준히 하게 돕는 것**이 코스의 목적인 이유 |
+| [C2] Singh 외 2024 (체계적 문헌고찰 · 메타분석) | 건강 습관 연구 20편(2,601명). 습관이 자리 잡는 데 **중앙값 59~66일**(개인차 4~335일). 아침에 하는 습관, 스스로 고른 습관이 더 강했다. "21일이면 습관이 된다"는 말은 근거가 없다. | 코스 길이(8주 ≈ 2개월) |
+| [C3] Brown 외 2022 (전문가 합의 권고) | 낮 동안 눈에 들어오는 빛을 **멜라놉신 기준 250 lux 이상**으로, 가능하면 **햇빛으로 먼저** 채우라고 권한다. 실내 조명은 보통 바깥보다 10배 이상 어둡다. | 겨울 미션(낮에 바깥 빛 받기) |
+| [C4] Rhodes 외 2010 (통제된 실험) | 영국 20~60세 120명, 여름 한낮 햇빛과 같은 양을 **주 3회 × 6주**(피부 35%) → 90%가 20 ng/mL 이상. 실제 햇빛으로 한 번에 약 13분. | 참고만 (2010년 자료라 코스 설계에는 쓰지 않음) |
+| [C6] Lee 외 2020 (국내 무작위 대조시험) | 대구 20~49세 비타민D 부족(20 ng/mL 미만) 성인 60명. 여름에 **주 3회 × 30~60분 × 1달**(피부 20~30%) 햇빛 그룹은 +0.9 ng/mL로 거의 오르지 않았고, 20 ng/mL에 도달한 사람은 2명뿐. 연구진은 "지금 권고로는 부족하다"고 결론. | 더 짧은 코스를 두지 않은 이유 · 12주 코스가 1달에서 멈추지 않고 유지 기간을 두는 이유 |
+| [C7] Carswell 외 2018 (무작위 대조시험) | 영국 군 신병(젊은 남성) 137명, 겨울. 여름 햇빛과 같은 빛의 램프(1.3 SED, 반팔 · 반바지)를 **4주 동안 주 3회 → 8주 동안 주 1회**. 경구 비타민D 그룹과 함께 **97%가 충분 수준(50 nmol/L)**에 도달. | 12주 채우고 유지 코스의 길이와 횟수 그대로 |
+| [C5] Samefors 외 2020 · Burns 외 2021 · Bonatto 외 2024 | 요양원 노인 주 5일 × 20~30분 × 2개월(비타민D · 정신 건강 개선), 영국 약 40만 명 관찰(바깥 시간 1시간 ↑ → 피로 ↓), 1,095명 설문(매일 · 오래 · 아침 햇빛일수록 기분과 관련 큼). | 보조 근거 (관찰 연구 · 노인 대상이라 핵심 근거로 쓰지 않음) |
+
+### 한계 (발표 때 미리 밝힐 것)
+
+1. **겨울 미션은 비타민D를 만들지 못한다.** 화면에서도 "비타민D를 만들기 어려워요"라고 밝히고, 습관을 이어 가는 것과 낮 빛(생활 리듬)만 말한다.
+2. 겨울 미션의 **20~30분은 빛 연구가 정한 값이 아니다.** [C1]과 같은 시간으로 맞춰 습관 시간을 일정하게 한 것이다.
+3. 겨울 미션은 **스스로 체크**한다 — 실제로 나갔는지 확인하지 않는다 ([C1]의 햇빛 일지와 같은 한계).
+4. **12주 코스의 근거 [C7]은 실제 햇빛이 아니라 햇빛과 같은 빛의 램프**로, 젊은 남성 군인을 대상으로 했다. 앱에서는 같은 횟수로 처방 시간을 채우게 한다.
+5. 코스는 혈중 비타민D를 재지 않는다. "회복"은 햇빛 습관이 다시 자리 잡는 것을 뜻하며, 결핍 치료를 뜻하지 않는다.
+
+### 출처
+
+| 번호 | 자료 | 링크 |
+|---|---|---|
+| [C1] | Joh H.K., Hwang S.S., Cho B., Lim C.S., Jung S.E. (2020). Effect of sun exposure versus oral vitamin D supplementation on serum 25-hydroxyvitamin D concentrations in young adults: A randomized clinical trial. *Clinical Nutrition* 39(3), 727-736. NCT03310242 | https://pubmed.ncbi.nlm.nih.gov/30987813/ |
+| [C2] | Singh B., Murphy A., Maher C., Smith A.E. (2024). Time to Form a Habit: A Systematic Review and Meta-Analysis of Health Behaviour Habit Formation and Its Determinants. *Healthcare* 12(23), 2488 | https://pubmed.ncbi.nlm.nih.gov/39685110/ |
+| [C3] | Brown T.M. 외 (2022). Recommendations for daytime, evening, and nighttime indoor light exposure to best support physiology, sleep, and wakefulness in healthy adults. *PLoS Biology* 20(3), e3001571 | https://pmc.ncbi.nlm.nih.gov/articles/PMC8929548/ |
+| [C4] | Rhodes L.E. 외 (2010). Recommended summer sunlight exposure levels can produce sufficient (≥20 ng ml⁻¹) but not the proposed optimal (≥32 ng ml⁻¹) 25(OH)D levels at UK latitudes. *J Invest Dermatol* 130(5), 1411-1418 | https://pubmed.ncbi.nlm.nih.gov/20072137/ |
+| [C6] | Lee Y.M., Kim S.A., Lee D.H. (2020). Can Current Recommendations on Sun Exposure Sufficiently Increase Serum Vitamin D Level?: One-Month Randomized Clinical Trial. *J Korean Med Sci* 35(8), e50. KCT0002671 | https://pubmed.ncbi.nlm.nih.gov/32103645/ |
+| [C7] | Carswell A.T. 외 (2018). Influence of Vitamin D Supplementation by Sunlight or Oral D3 on Exercise Performance. *Med Sci Sports Exerc* 50(12), 2555-2564 | https://pubmed.ncbi.nlm.nih.gov/30048414/ |
+| [C5] | Samefors M. 외 (2020). *J Nutr Health Aging* 24(10), 1047-1052 · Burns A.C. 외 (2021). *J Affect Disord* 295, 347-352 · Bonatto F.S. 외 (2024). *Chronobiol Int* 41(8), 1128-1141 | https://pmc.ncbi.nlm.nih.gov/articles/PMC12876703/ · https://pubmed.ncbi.nlm.nih.gov/34488088/ · https://pubmed.ncbi.nlm.nih.gov/39058252/ |

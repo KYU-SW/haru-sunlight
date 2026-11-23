@@ -139,14 +139,14 @@ var App = (function () {
   }
 
   /* ---------- 라우팅 ---------- */
-  var TABS = ['home', 'timer', 'weekly', 'settings'];
+  var TABS = ['home', 'timer', 'weekly', 'course', 'settings'];
 
   /* 탭 버튼·화면의 active 클래스만 맞춘다. renderSkeleton/renderError처럼
      go()를 거치지 않고 state.tab에 직접 그리는 경로도 이걸 먼저 불러야
      그 화면이 실제로 보인다(안 그러면 콘텐츠는 그려지는데 숨겨진 채로 남는다). */
   function applyActiveTab(tab) {
     [].forEach.call(document.querySelectorAll('.tab'), function (t) {
-      /* 분석(weekly)은 마이페이지의 하위 화면이라 마이페이지 탭을 켜 둔다.
+      /* 회복 코스는 자기 탭이 있다. 분석(weekly)은 마이페이지의 하위 화면이라 마이페이지 탭을 켜 둔다.
          타이머는 탭 자체가 없으므로 홈 탭을 켜 둔다 */
       var lit = tab === 'weekly' ? 'settings' : tab === 'timer' ? 'home' : tab;
       t.classList.toggle('on', t.dataset.tab === lit);
@@ -186,6 +186,8 @@ var App = (function () {
     /* 설정 탭은 날씨를 못 받은 상태(키 없음·오류)에서도 항상 열려야 한다 —
        거기서 config.local.js 설정 방법을 안내한다 */
     if (state.tab === 'settings') return SettingsView.render();
+    /* 회복 코스도 날씨 없이 열린다 (기록 보기 · 겨울 미션 체크) */
+    if (state.tab === 'course') return CourseView.render();
 
     if (state.loading) return renderSkeleton();
     if (state.error) return renderError();

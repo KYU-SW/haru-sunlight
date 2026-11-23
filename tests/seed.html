@@ -10,10 +10,11 @@
        tests/seed.html?tab=home&uvi=0.5&temp=22        장마·흐림 모드로 (창 없음)
        tests/seed.html?tab=weekly
 
-     ⚠️ 겨울 모드는 여기서 재현할 수 없다 — 태양고도는 실제 오늘 날짜·위경도로
-        Solar 모듈이 실시간 계산하므로, 한국 여름 날짜에는 항상 45° 이상이 나온다.
-        기상청 API가 국내 전용이 된 이후로는 남반구 겨울 도시로 우회할 수도 없다.
-        겨울 모드를 보려면 실제 겨울철(11~2월)에 이 화면을 열어야 한다. -->
+       tests/seed.html?tab=home&uvi=1.5&temp=8         겨울 모드로 (자외선지수 2 미만)
+       tests/seed.html?tab=course&course=15             회복 코스 15일째 (course=57이면 끝난 화면)
+       tests/seed.html?tab=course                       회복 코스 고르기(카드 2장)
+       tests/seed.html?tab=course&course=20&ctype=load12  12주 채우고 유지 코스 20일째 (course=85면 끝난 화면)
+-->
 <script>
 var q = new URLSearchParams(location.search);
 var NS = 'sunrx.';
@@ -26,8 +27,34 @@ localStorage.setItem(NS + 'profile', JSON.stringify({
   wakeTime: q.get('wake') || '07:00',
   useCircadian: true,
   supplement: q.get('supp') === '1',
-  notify: false
+  notify: false,
+  consent: { agreed: true, version: 'v2', at: Date.now() }    // 시연용 — 동의 화면을 건너뛴다
 }));
+
+/* 회복 코스 — course=15 면 15일째인 코스를 심는다 (지난날은 채움 · 못 채움 · 쉬는 날 · 겨울 미션이 섞이게) */
+if (q.get('course')) {
+  var ctype = q.get('ctype') === 'load12' ? 'load12' : 'daily8';
+  var cn = Math.max(1, Math.min(ctype === 'load12' ? 85 : 57, +q.get('course')));
+  var cp = function (n) { return n < 10 ? '0' + n : '' + n; };
+  var ck = function (d) { return d.getFullYear() + '-' + cp(d.getMonth() + 1) + '-' + cp(d.getDate()); };
+  var c0 = new Date(); c0.setHours(12, 0, 0, 0);
+  var cs = new Date(c0.getTime() - (cn - 1) * 86400000);
+  var cdays = {}, cdaily = {};
+  var pattern = ['vitd+', 'light+', 'vitd-', 'rest', 'light+', 'vitd+', 'light-'];
+  for (var ci = 0; ci < cn - 1; ci++) {
+    var cd = ck(new Date(cs.getTime() + ci * 86400000));
+    var pt = pattern[(ci * 3 + (ci >> 2)) % 7];
+    if (ci >= cn - 15 && pt === 'vitd-') pt = 'vitd+';        // 마지막 2주는 더 잘 채운 것으로
+    var kind = pt.replace(/[+-]/, '');
+    cdays[cd] = { kind: kind };
+    if (pt === 'light+') cdays[cd].light = true;
+    if (pt === 'vitd+') cdaily[cd] = 100;
+  }
+  localStorage.setItem(NS + 'course', JSON.stringify({ type: ctype, start: ck(cs), days: cdays }));
+  localStorage.setItem(NS + 'courseDaily', JSON.stringify(cdaily));
+} else {
+  localStorage.removeItem(NS + 'course');
+}
 
 var lat = +(q.get('lat') || 37.5665), lon = +(q.get('lon') || 126.9780);
 localStorage.setItem(NS + 'location', JSON.stringify({
@@ -80,9 +107,13 @@ if (q.get('hist') !== '0') {
     sessions.unshift({ dateKey: key, at: d.getTime(), minutes: Math.round(p / 6),
       percent: p, clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
   });
+  /* 코스를 심었으면 그 채운 날도 일별 충전률에 합친다 */
+  var cdl = JSON.parse(localStorage.getItem(NS + 'courseDaily') || '{}');
+  for (var dk in cdl) daily[dk] = Math.max(daily[dk] || 0, cdl[dk]);
   localStorage.setItem(NS + 'daily', JSON.stringify(daily));
   localStorage.setItem(NS + 'sessions', JSON.stringify(sessions));
 }
+localStorage.removeItem(NS + 'courseDaily');
 location.replace('../index.html#' + (q.get('tab') || 'home'));
 </script>
 </body></html>
