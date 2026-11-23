@@ -93,8 +93,15 @@ var Repo = (function () {
   function setTimer(o) { write('timer', o); }
   function clearTimer() { try { localStorage.removeItem(NS + 'timer'); } catch (e) {} }
 
+  /* 회복 코스 {start:'2026-11-21', days:{'2026-11-21':{kind:'light', light:true}}} (core/course.js) */
+  function getCourse() { return read('course', null); }
+  function setCourse(c) {
+    if (c) write('course', c);
+    else { try { localStorage.removeItem(NS + 'course'); } catch (e) {} }
+  }
+
   function reset() {
-    ['profile', 'location', 'daily', 'load', 'sessions', 'weather', 'timer'].forEach(function (k) {
+    ['profile', 'location', 'daily', 'load', 'sessions', 'weather', 'timer', 'course'].forEach(function (k) {
       try { localStorage.removeItem(NS + k); } catch (e) {}
     });
   }
@@ -107,6 +114,7 @@ var Repo = (function () {
     getSessions: getSessions, addSession: addSession,
     getWeatherCache: getWeatherCache, setWeatherCache: setWeatherCache,
     getTimer: getTimer, setTimer: setTimer, clearTimer: clearTimer,
+    getCourse: getCourse, setCourse: setCourse,
     reset: reset
   };
 })();
