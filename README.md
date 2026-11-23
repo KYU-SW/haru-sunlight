@@ -8,7 +8,7 @@
 `v_2.3` · 회복 코스 탭 (8주 · 12주) · 피부 타입 풀이 · 기온별 옷차림 자동
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
-**관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html  
+**관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html (관리자 로그인 필요 · 로그인 없이 **예시 데이터로 보기** 가능)  
 **테스트 결과:** [자동 테스트(Actions)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) · [단위](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) · [통합](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) · [실제 기상청 연결](https://kyu-sw.github.io/haru-sunlight/tests/live.html) · [Firestore 규칙(에뮬레이터)](tests/firestore/rules.test.mjs) — 절차와 결과는 [`TESTING.md`](TESTING.md)
 
 <table><tr><td align="center"><img src="docs/images/home-sunny.png" width="220" alt="홈 — 오늘의 처방"><br><sub>홈 — 오늘의 처방</sub></td><td align="center"><img src="docs/images/timer.png" width="220" alt="타이머 — 남은 시간 · 충전률"><br><sub>타이머 — 남은 시간 · 충전률</sub></td><td align="center"><img src="docs/images/course-running.png" width="220" alt="회복 코스 — 오늘 할 일 · 기록"><br><sub>회복 코스 — 오늘 할 일 · 기록</sub></td></tr></table>
@@ -176,8 +176,7 @@ flowchart TD
 
 **타이머**는 탭이 아니라 홈에서 '타이머 시작'을 누르면 열립니다 — 밖에 있는 동안 남은 시간 · 충전률, 옷차림을 바꾸면 바로 다시 계산.
 
-관리자는 앱 로그인 화면에서 아이디 `admin` 으로 로그인하면 **관리자 대시보드**(`admin.html`)로 넘어갑니다.
-계정은 Firebase 콘솔에서 만들고, 비밀번호는 저장소에 적지 않습니다.
+**관리자 대시보드**(`admin.html`)는 관리자 계정으로만 실제 기록을 볼 수 있습니다 (Firestore 규칙이 관리자 이메일 + UID를 확인). 계정 정보는 저장소에 적지 않습니다.
 
 마이페이지 안에서 들어가는 화면
 
