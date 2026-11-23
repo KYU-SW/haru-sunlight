@@ -184,17 +184,38 @@ flowchart TD
 - **노출 이력** — 날짜별로 몇 분 쬐고 몇 % 채웠는지
 - **이번 주 분석** — 주간 충전률 막대 · 체내 저장량 · 앞으로 며칠 예보
 
-## 실행 방법
+## 실행 · 배포
 
-설치할 것 없이 정적 파일만으로 돌아갑니다. 폴더에서 아무 로컬 서버나 띄우면 됩니다.
+### 1. 바로 써 보기 — 배포 사이트 (추천)
+
+**https://kyu-sw.github.io/haru-sunlight/** 를 열면 바로 씁니다. 설치할 것이 없습니다.
+
+- 컴퓨터에서는 휴대폰 틀 안에, 휴대폰에서는 화면 가득 보입니다.
+- 휴대폰에서 **홈 화면에 추가**하면 앱처럼 아이콘으로 실행됩니다 (PWA).
+- 배포 사이트는 기상청 서비스키가 들어간 상태라 **실제 기상청 예보**로 계산합니다 ([실제 연결 확인](https://kyu-sw.github.io/haru-sunlight/tests/live.html)).
+
+### 2. 배포는 어떻게 되나요 — GitHub Actions
+
+`main`에 올리면 사람이 손대지 않아도 테스트와 배포가 자동으로 돌아갑니다.
+
+| 워크플로 | 언제 | 하는 일 |
+|---|---|---|
+| [`test.yml`](.github/workflows/test.yml) · [실행 기록](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) | 모든 브랜치 푸시 · PR | 단위 · 통합 테스트(헤드리스 크롬) + Firestore 보안 규칙 테스트(Firebase 에뮬레이터). 결과를 Summary 표로 공개 |
+| [`deploy-pages.yml`](.github/workflows/deploy-pages.yml) · [실행 기록](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml) | `main` 푸시 | **build** — 저장소 비밀값의 기상청 키를 `config.js`에 채움 → CSS · JS 주소에 커밋 번호를 붙여 캐시 무효화 → 사이트 묶음 업로드 · **deploy** — GitHub Pages에 게시 |
+
+- 기상청 키는 저장소 코드에 없고, 배포하는 순간에만 비밀값(Settings › Secrets and variables › Actions › `KMA_SERVICE_KEY`)에서 꺼내 씁니다.
+- 작업 흐름: `co_work` 브랜치에서 작업 · 테스트 확인 → `main`에 머지 → 자동 배포.
+
+### 3. 내 컴퓨터에서 실행 (개발용)
+
+정적 파일만으로 돌아가므로 폴더에서 아무 로컬 서버나 띄우면 됩니다.
 
 ```bash
 python -m http.server 8762
+# 브라우저로 http://localhost:8762 열기
 ```
 
-브라우저에서 `http://localhost:8762` 를 엽니다.
-컴퓨터에서는 휴대폰 틀 안에 보이고, 휴대폰에서는 앱 화면이 꽉 차게 보입니다.
-휴대폰에서 **홈 화면에 추가**하면 앱처럼 아이콘으로 실행됩니다(PWA).
+로컬에서 실제 예보를 받으려면 아래 '날씨 자료'대로 `config.local.js`에 키를 넣습니다. 키가 없으면 중계 서버로 받습니다.
 
 ### 날씨 자료 (기상청 API)
 
@@ -208,17 +229,17 @@ python -m http.server 8762
 
 ### 테스트 화면
 
-푸시할 때마다 GitHub Actions(`.github/workflows/test.yml`)가 헤드리스 크롬으로 단위 · 통합 테스트를 돌립니다.
+주소를 누르면 배포 사이트에서 바로 열립니다. 푸시할 때마다 GitHub Actions(`test.yml`)가 같은 테스트를 자동으로 돌립니다.
 절차 · 시나리오 · 최근 결과는 [`TESTING.md`](TESTING.md).
 
 | 주소 | 용도 |
 |---|---|
-| `tests/seed.html?tab=home` | 모의 날씨 · 기록을 넣고 바로 화면 확인 (`&uvi=9&temp=37` 처럼 조건 변경 가능) |
-| `tests/smoke.html` | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
-| `tests/integration.html` | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의) |
-| `tests/live.html` | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 (배포 사이트에서 열기) |
-| `tests/firestore/` | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 24가지 검사 (`npm test`, Java 21 필요) |
-| `tests/timer-running.html` | 타이머가 돌아가는 상태 확인 |
+| `tests/seed.html?tab=home` (로컬 개발용) | 모의 날씨 · 기록을 넣고 바로 화면 확인 (`&uvi=9&temp=37` 처럼 조건 변경 가능) |
+| [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
+| [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의) |
+| [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 |
+| [`tests/firestore/`](tests/firestore/rules.test.mjs) | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 24가지 검사 (`npm test`, Java 21 필요) |
+| `tests/timer-running.html` (로컬 개발용) | 타이머가 돌아가는 상태 확인 |
 
 ## 폴더 구조
 
