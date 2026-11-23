@@ -96,11 +96,34 @@ service cloud.firestore {
       allow create: if isAdmin()
         && request.resource.data.keys().hasOnly(['at','by','action','target','before','after','reason'])
         && request.resource.data.by == request.auth.uid
-        && request.resource.data.action in ['add','edit','delete','merge','addUser','deleteUser']
+        && request.resource.data.action in ['add','edit','delete','merge','addUser','deleteUser',
+                                            'importOffline','deleteOffline']
         && request.resource.data.reason is string
         && request.resource.data.reason.size() >= 1 && request.resource.data.reason.size() <= 200
         && request.resource.data.target is string && request.resource.data.target.size() <= 160;
       allow update, delete: if false;
+    }
+
+    // 현장에서 모은 기록 (참가자별 요약 · 익명 ID) — 관리자만 읽고 · 올리고 · 지운다
+    // 관리자 화면 설정 탭에서 파일을 올리면 이 컬렉션을 파일 내용으로 바꾼다
+    match /offline/{id} {
+      allow read, delete: if isAdmin();
+      allow create, update: if isAdmin()
+        && id.matches('^[a-z0-9]{4,12}$')
+        && request.resource.data.keys().hasOnly(
+             ['records','setRate','goalDone','goalTotal','completer','before','after','exceptions','importedAt','editedBy'])
+        && request.resource.data.editedBy == request.auth.uid
+        && request.resource.data.records is int && request.resource.data.records >= 0 && request.resource.data.records <= 1000
+        && request.resource.data.goalTotal is int && request.resource.data.goalTotal >= 0 && request.resource.data.goalTotal <= 1000
+        && request.resource.data.goalDone is int && request.resource.data.goalDone >= 0
+        && request.resource.data.goalDone <= request.resource.data.goalTotal
+        && request.resource.data.setRate is number && request.resource.data.setRate >= 0 && request.resource.data.setRate <= 100
+        && request.resource.data.before is number && request.resource.data.before >= 0 && request.resource.data.before <= 1440
+        && request.resource.data.after is number && request.resource.data.after >= 0 && request.resource.data.after <= 1440
+        && request.resource.data.completer is bool
+        && request.resource.data.exceptions is map
+        && request.resource.data.exceptions.keys().hasOnly(
+             ['late_over_5min','timer_not_set','missed_confirmation','timer_reset']);
     }
 
     // 그 외는 전부 막음

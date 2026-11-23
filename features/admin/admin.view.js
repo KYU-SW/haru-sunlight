@@ -6,6 +6,7 @@
 
    데이터
      · 타이머 기록  — Firestore users · sessions (관리자 계정만 읽힘, firestore.rules isAdmin)
+     · 현장 기록    — Firestore offline (현장에서 모은 참가자별 요약 · 익명 ID). 설정 탭에서 올리고, 요약 · 타이머 기록에 합쳐 센다
      · 예시 데이터  — 기록이 쌓이기 전 화면 확인용. 화면 위에 '예시'가 계속 보인다.
    설문은 따로 진행한다. 여기서는 앱이 모은 객관적 기록만 본다.
    참가자 수는 따로 정하지 않는다 — Firestore에 들어온 사람 수가 곧 분모다.
@@ -23,6 +24,8 @@ var AdminView = (function () {
     sel: null,             // 기록 관리 — 기록을 보고 있는 참가자 uid
     edit: null,            // 기록 관리 — { id } 고치는 중 / { id: null } 새로 넣는 중
     merge: null,           // 기록 관리 — 합칠 참가자 uid
+    offline: null,         // 현장 기록 — 참가자별 요약 목록 (Firestore offline)
+    offlineErr: false,     // 현장 기록을 읽지 못함 (규칙을 새로 게시하기 전)
     tab: 'summary',
     loading: false
   };
@@ -83,7 +86,11 @@ var AdminView = (function () {
     var logs = db.collection('adminLog').orderBy('at', 'desc').limit(50).get()
       .then(function (q) { return q.docs.map(function (d) { return d.data(); }); })
       .catch(function () { return []; });
-    return Promise.all([db.collection('users').get(), db.collection('sessions').get(), logs])
+    /* 현장 기록도 규칙을 새로 게시하기 전이면 못 읽는다 — 못 읽어도 나머지는 보여 준다 */
+    var offline = db.collection('offline').get()
+      .then(function (q) { return q.docs.map(function (d) { var x = d.data(); x.id = d.id; return x; }); })
+      .catch(function () { return null; });
+    return Promise.all([db.collection('users').get(), db.collection('sessions').get(), logs, offline])
       .then(function (r) {
         /* 지금 로그인한 관리자 계정의 문서는 참가자에서 뺀다 (관리자가 앱에서 동의·타이머를 눌러도 섞이지 않게) */
         var me = auth.currentUser ? auth.currentUser.uid : null;
@@ -92,6 +99,9 @@ var AdminView = (function () {
         state.sessions = r[1].docs.map(function (d) { var x = d.data(); x._id = d.id; return x; })
           .filter(function (x) { return x.uid !== me; });
         state.log = r[2];
+        state.offlineErr = r[3] === null;
+        try { state.offline = r[3] && r[3].length ? AdminOffline.parse(JSON.stringify(r[3])) : null; }
+        catch (e) { state.offline = null; state.offlineErr = true; }
         state.mode = 'live'; state.loading = false; state.error = null;
         render();
       })
@@ -278,6 +288,38 @@ var AdminView = (function () {
   }
 
   /* =========================================================
+     앱 기록 + 오프라인 기록 합치기
+     오프라인 기록(현장에서 모은 참가자별 요약, Firestore offline)은 따로 나누지 않고 같은 참가자 명단으로 센다.
+     오프라인 기록의 '기록 1개'는 '쓴 날 하루'로, '목표 완료 기록'은 '목표를 다 채운 날'로 본다.
+     오프라인 기록에는 쬔 시간(분) · 날짜가 없어서 주별 그래프 · 스탬프 · 계속 쓴 사람 · 알림은
+     앱 기록이 있는 사람만으로 센다. 지연 시간은 오프라인 기록에만 있다.
+     ========================================================= */
+  function combined(rec) {
+    var off = state.offline && state.offline.length ? AdminOffline.summary(state.offline) : null;
+    var op = off ? off.people : [];
+    var appDays = 0, appGoals = 0, offDays = 0, offGoals = 0;
+    rec.people.forEach(function (p) { appDays += p.days; appGoals += p.goals; });
+    op.forEach(function (p) { offDays += p.goalTotal; offGoals += p.goalDone; });
+    return {
+      off: off,
+      n: rec.n + op.length,
+      withData: rec.withData + op.filter(function (p) { return p.records > 0; }).length,
+      times: rec.sessions + (off ? off.records : 0),
+      goals: rec.goals.concat(op.map(function (p) { return p.goalDone; })),               // 사람별 목표 다 채운 날
+      goalRate: (appDays + offDays) ? (appGoals + offGoals) / (appDays + offDays) : NaN   // 쓴 날 중 목표를 다 채운 날
+    };
+  }
+
+  function hbarList(items, total) {
+    var max = Math.max.apply(null, items.map(function (i) { return i.n; }).concat([1]));
+    if (!total) return empty();
+    return '<div class="ad-hbars">' + items.map(function (i) {
+      return '<div class="ad-hbar"><span class="ad-hbar-l">' + esc(i.label) + '</span>' +
+        '<span class="ad-hbar-t"><i style="width:' + (i.n / max * 100) + '%"></i></span><b>' + i.n + '명</b></div>';
+    }).join('') + '</div>';
+  }
+
+  /* =========================================================
      탭 ① 요약
      ========================================================= */
   function growth(rec) {
@@ -287,66 +329,92 @@ var AdminView = (function () {
   }
 
   function summaryHtml(x) {
-    var rec = x.rec, c = x.c, w = rec.weekly;
+    var rec = x.rec, c = x.c, w = rec.weekly, m = combined(rec), off = m.off;
     var g = growth(rec);
+    var appOnly = off ? ' · 앱 기록이 있는 ' + rec.n + '명 기준' : '';
     var tiles = [
       { lab: '일주일에 햇빛 쬔 시간', val: w.length ? '첫 주 ' + fmt(w[0].mean) + '분 → <b>' + fmt(w[w.length - 1].mean) + '분</b>' : '—',
-        sub: g === null ? '한 사람 평균 · 첫 주와 마지막 주 비교' : '한 사람 평균 · 첫 주보다 ' + pct(Math.abs(g)) + (g >= 0 ? ' 늘었어요' : ' 줄었어요'),
+        sub: (g === null ? '한 사람 평균 · 첫 주와 마지막 주 비교' : '한 사람 평균 · 첫 주보다 ' + pct(Math.abs(g)) + (g >= 0 ? ' 늘었어요' : ' 줄었어요')) + appOnly,
         ok: g === null ? null : g * 100 >= c.growth, goal: '목표: ' + c.growth + '% 이상 늘기' },
-      { lab: '등록한 사람', val: '<b>' + rec.n + '</b>명', sub: '타이머를 쓴 사람 ' + rec.withData + '명 · 타이머 ' + rec.sessions + '번' },
-      { lab: retLabel(rec.weeks), val: rec.retained === null ? '—' : '<b>' + rec.retained + '</b> / ' + rec.n + '명',
-        sub: rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요' },
-      { lab: '하루 목표를 다 채운 날', val: '한 사람당 <b>' + fmt(S.mean(rec.goals)) + '</b>일', sub: '비타민D 하루 목표를 100% 채운 날' },
-      { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' },
-      { lab: '하루에 채운 양', val: '평균 <b>' + fmt(rec.avgCharge, 0) + '%</b>', sub: '타이머를 쓴 날 기준 · 100%면 하루 목표만큼' }
+      { lab: '등록한 사람', val: '<b>' + m.n + '</b>명', sub: '타이머를 쓴 사람 ' + m.withData + '명 · 타이머 ' + m.times + '번' }
     ];
-    return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec) + '</p></div>' +
+    if (off) tiles.push(
+      { lab: '지연 시간 (평균)', val: fmt(off.beforeMean) + '분 → <b>' + fmt(off.afterMean) + '분</b>',
+        sub: (off.change === null ? '사용 전 → 사용 후' : '사용 전보다 ' + pct(Math.abs(off.change), 1) + (off.change >= 0 ? ' 줄었어요' : ' 늘었어요')) +
+          ' · 줄어든 사람 ' + off.shorter + ' / ' + off.n + '명' });
+    tiles.push(
+      { lab: retLabel(rec.weeks), val: rec.retained === null ? '—' : '<b>' + rec.retained + '</b> / ' + rec.n + '명',
+        sub: (rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요') + appOnly },
+      { lab: '하루 목표를 다 채운 날', val: '한 사람당 <b>' + fmt(S.mean(m.goals)) + '</b>일', sub: '비타민D 하루 목표를 100% 채운 날' + (off ? ' · 쓴 날의 ' + pct(m.goalRate) : '') },
+      { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
+      { lab: '하루에 채운 양', val: '평균 <b>' + fmt(rec.avgCharge, 0) + '%</b>', sub: '타이머를 쓴 날 기준 · 100%면 하루 목표만큼' + appOnly }
+    );
+    return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-tiles">' + tiles.map(function (t) {
         return '<div class="ad-tile"><span class="ad-lab">' + t.lab + '</span><div class="ad-big">' + t.val + '</div>' +
           '<span class="ad-muted">' + t.sub + '</span>' + (t.ok !== undefined ? '<div class="ad-tile-f">' + pill(t.ok) + '<span class="ad-muted">' + t.goal + '</span></div>' : '') + '</div>';
       }).join('') + '</div>' +
       card('주별 햇빛 쬔 시간 (한 사람 평균)', lineCI(w, '분'), rec.n + '명 기준 · 연한 띠는 오차 범위');
   }
-  function periodText(rec) {
-    if (!rec.start) return '아직 기록이 없어요';
-    return rec.start + ' ~ ' + rec.end + ' (' + rec.weeks + '주) · ' + rec.n + '명 · 타이머 ' + rec.sessions + '번';
+  function periodText(rec, m) {
+    var n = m ? m.n : rec.n, times = m ? m.times : rec.sessions;
+    if (!rec.start) return n ? n + '명 · 타이머 ' + times + '번' : '아직 기록이 없어요';
+    return rec.start + ' ~ ' + rec.end + ' (' + rec.weeks + '주) · ' + n + '명 · 타이머 ' + times + '번';
   }
 
   /* =========================================================
      탭 ② 타이머 기록
      ========================================================= */
   function recordsHtml(x) {
-    var rec = x.rec, c = x.c;
+    var rec = x.rec, c = x.c, m = combined(rec), off = m.off;
     var people = rec.people.slice().sort(function (a, b) { return b.total - a.total; });
-    return '<div class="ad-hd"><h2>타이머 기록</h2><p class="ad-muted">' + periodText(rec) + '</p></div>' +
+    var numbers = [
+      ['등록한 사람', m.n + '명'],
+      ['타이머를 쓴 사람', m.withData + '명'],
+      [c.stampMin + '분 이상 쬔 날 (한 사람당)', fmt(S.mean(rec.stamps)) + '일'],
+      ['하루 목표를 다 채운 날 (한 사람당)', fmt(S.mean(m.goals)) + '일'],
+      ['하루에 채운 양 (평균)', fmt(rec.avgCharge, 0) + '%']
+    ];
+    if (off) numbers.push(
+      ['지연 시간 평균 (사용 전 → 후)', fmt(off.beforeMean) + ' → ' + fmt(off.afterMean) + '분'],
+      ['지연이 줄어든 사람', off.shorter + ' / ' + off.n + '명']);
+    numbers.push(
+      ['가장 오래 안 쓴 기간 (보통)', fmt(rec.gapMedian, 0) + '일'],
+      [retLabel(rec.weeks), retCount(rec)],
+      ['첫 주보다 마지막 주에 더 쬔 사람', rec.improved === null ? '—' : rec.improved + '명'],
+      ['알림 켠 사람 · 일주일 평균', fmt(rec.notify.onMean) + '분 (' + rec.notify.on + '명)'],
+      ['알림 끈 사람 · 일주일 평균', fmt(rec.notify.offMean) + '분 (' + rec.notify.off + '명)']);
+    var appRows = people.map(function (p) {
+      return ['<code>' + esc(p.uid.slice(0, 6)) + '</code>', p.days + '일', fmt(p.total, 0), p.stamps, p.goals, '—', p.gap + '일', p.retained ? '예' : '아니오', p.notify ? '켬' : '끔'];
+    });
+    var offRows = off ? off.people.map(function (p) {
+      return ['<code>' + esc(p.id) + '</code>', p.records + '일', '—', '—', p.goalDone,
+        fmt(p.before) + ' → ' + fmt(p.after) + (p.change === null ? '' : p.change >= 0 ? ' <b>' + pct(p.change, 0) + '↓</b>' : ' <i>' + pct(-p.change, 0) + '↑</i>'),
+        '—', '—', '—'];
+    }) : [];
+
+    return '<div class="ad-hd"><h2>타이머 기록</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-grid2">' +
         card('주별 햇빛 쬔 시간 (한 사람 평균)', lineCI(rec.weekly, '분') +
           table(['주', '시작일', '한 사람 평균(분)', '오차 범위(분)', '모두 합친 시간(분)'], rec.weekly.map(function (p) {
             return [p.week + '주', p.from, fmt(p.mean), fmt(Math.max(0, p.ci[0])) + ' ~ ' + fmt(p.ci[1]), fmt(p.total, 0)];
-          })), '타이머를 안 쓴 사람은 0분으로 계산해요') +
-        card('숫자로 보기', rows([
-          ['등록한 사람', rec.n + '명'],
-          ['타이머를 쓴 사람', rec.withData + '명'],
-          [c.stampMin + '분 이상 쬔 날 (한 사람당)', fmt(S.mean(rec.stamps)) + '일'],
-          ['하루 목표를 다 채운 날 (한 사람당)', fmt(S.mean(rec.goals)) + '일'],
-          ['하루에 채운 양 (평균)', fmt(rec.avgCharge, 0) + '%'],
-          ['가장 오래 안 쓴 기간 (보통)', fmt(rec.gapMedian, 0) + '일'],
-          [retLabel(rec.weeks), retCount(rec)],
-          ['첫 주보다 마지막 주에 더 쬔 사람', rec.improved === null ? '—' : rec.improved + '명'],
-          ['알림 켠 사람 · 일주일 평균', fmt(rec.notify.onMean) + '분 (' + rec.notify.on + '명)'],
-          ['알림 끈 사람 · 일주일 평균', fmt(rec.notify.offMean) + '분 (' + rec.notify.off + '명)']
-        ])) +
+          })), '타이머를 안 쓴 사람은 0분으로 계산해요' + (off ? ' · 앱 기록이 있는 ' + rec.n + '명 기준' : '')) +
+        card('숫자로 보기', rows(numbers)) +
         card(c.stampMin + '분 이상 쬔 날이 며칠인 사람이 몇 명?', groups(rec.stamps), '예: 8~14일 줄의 숫자 = 그만큼 쬔 사람 수') +
-        card('하루 목표를 다 채운 날이 며칠인 사람이 몇 명?', groups(rec.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
+        card('하루 목표를 다 채운 날이 며칠인 사람이 몇 명?', groups(m.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
+        (off ?
+          card('사용 전 지연 시간별 사람 수', hbarList(off.beforeBins, off.n), '한 사람의 평균 지연 기준') +
+          card('사용 후 지연 시간별 사람 수', hbarList(off.afterBins, off.n), '한 사람의 평균 지연 기준') +
+          card('예외가 생긴 횟수', table(['예외', '횟수', '사람'], off.exceptions.map(function (e) {
+            return [esc(e.label), e.times + '번', e.people + '명'];
+          })), '한 사람이 여러 번 겪은 것도 모두 세요') : '') +
         card('연령대별', groupTable(rec.byAge, rec.weeks), '온보딩에서 입력한 나이를 10살 단위로 묶었어요') +
         card('BMI 구간별', groupTable(rec.byBmi, rec.weeks), '대한비만학회 기준 · 저체중 18.5 미만 · 정상 23 미만 · 비만 전단계 25 미만 · 1단계 비만 30 미만') +
       '</div>' +
-      card('사람별 기록', '<div class="ad-bar-r"><span class="ad-muted">이름 대신 익명 ID 앞 6자리만 보여요.</span>' +
+      card('사람별 기록', '<div class="ad-bar-r"><span class="ad-muted">이름 대신 익명 ID만 보여요. 기록에 없는 칸은 —로 표시해요.</span>' +
           '<button class="ad-btn sm sub" id="ad-csv">기록 CSV 내려받기</button></div>' +
-        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 다 채운 날', '가장 오래 안 쓴 기간', retLabel(rec.weeks), '알림'],
-          people.map(function (p) {
-            return ['<code>' + esc(p.uid.slice(0, 6)) + '</code>', p.days + '일', fmt(p.total, 0), p.stamps, p.goals, p.gap + '일', p.retained ? '예' : '아니오', p.notify ? '켬' : '끔'];
-          })));
+        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 다 채운 날', '지연 사용 전 → 후(분)', '가장 오래 안 쓴 기간', retLabel(rec.weeks), '알림'],
+          appRows.concat(offRows)));
   }
 
   /* =========================================================
@@ -362,7 +430,8 @@ var AdminView = (function () {
      ========================================================= */
   var CLOTH = [['shortShort', '반팔 + 반바지'], ['shortLong', '반팔 + 긴바지'], ['longLong', '긴팔 + 긴바지']];
   var ACTIONS = { add: '기록 추가', edit: '기록 수정', delete: '기록 삭제', merge: '참가자 합치기',
-                  addUser: '참가자 추가', deleteUser: '참가자 삭제' };
+                  addUser: '참가자 추가', deleteUser: '참가자 삭제',
+                  importOffline: '현장 기록 올리기', deleteOffline: '현장 기록 지우기' };
 
   function sid(x) { return x._id || (x.uid + '_' + x.at); }
   function shortId(uid) { return /^manual-/.test(uid) ? uid : uid.slice(0, 6); }
@@ -454,10 +523,11 @@ var AdminView = (function () {
     b.set(db.collection('adminLog').doc(), log);
     return b.commit().then(applyLocal);
   }
-  function fail(e) {
+  function failText(e) {
     var c = (e && e.code) || '';
-    toast(c === 'permission-denied' ? '저장하지 못했어요 — Firestore 규칙을 새로 게시했는지 확인해 주세요' : '저장하지 못했어요 (' + (c || e) + ')');
+    return c === 'permission-denied' ? '저장하지 못했어요 — Firestore 규칙을 새로 게시했는지 확인해 주세요' : '저장하지 못했어요 (' + (c || e) + ')';
   }
+  function fail(e) { toast(failText(e)); }
   function done(msg) { state.edit = null; state.merge = null; render(); toast(msg); }
 
   /* ---------- 화면 ---------- */
@@ -654,6 +724,78 @@ var AdminView = (function () {
   }
 
   /* =========================================================
+     현장에서 모은 기록 (Firestore offline) — 설정 탭에서 올리고 지운다
+     파일을 올리면 offline 컬렉션을 그 파일 내용으로 바꾼다(없어진 ID는 지운다). 변경 내역은 adminLog에 남긴다.
+     ========================================================= */
+  function offlineCardHtml() {
+    var n = state.offline ? state.offline.length : 0;
+    var where = state.mode === 'live' ? 'Firestore' : '이 화면(예시)';
+    var status = state.offlineErr ? '<b>읽지 못했어요</b> — Firestore 규칙을 새로 게시했는지 확인해 주세요' :
+      (n ? '<b>' + n + '명</b>의 기록이 ' + where + '에 있어요' : '<b>아직 올린 기록이 없어요</b>');
+    return '<section class="ad-card ad-form">' +
+      '<div class="ad-card-h"><h3>현장에서 모은 기록</h3><span class="ad-muted">익명화한 기록 파일(offline-records.json)을 올리면 요약과 타이머 기록에 함께 들어가요. 다시 올리면 파일 내용으로 바뀌어요.</span></div>' +
+      '<div class="ad-bar-r"><span>' + status + '</span>' +
+        '<span><label class="ad-btn sm sub ad-file">파일 올리기<input type="file" id="of-file" accept=".json,application/json"></label>' +
+        (n ? ' <button class="ad-link" id="of-clear">모두 지우기</button>' : '') + '</span></div>' +
+    '</section>';
+  }
+
+  function writeOffline(list, entry) {
+    var old = state.offline || [];
+    function applyLocal() {
+      state.offline = list.length ? list : null; state.offlineErr = false;
+      var e = {}; for (var k in entry) e[k] = entry[k];
+      e.at = Date.now(); state.log.unshift(e);
+    }
+    var me = (auth && auth.currentUser && state.mode === 'live') ? auth.currentUser.uid : 'demo';
+    entry.by = me;
+    if (state.mode !== 'live') { applyLocal(); return Promise.resolve(); }
+    var keep = {}; list.forEach(function (p) { keep[p.id] = true; });
+    var b = db.batch(), FV = firebase.firestore.FieldValue, ops = 0;
+    old.forEach(function (p) { if (!keep[p.id]) { b.delete(db.collection('offline').doc(p.id)); ops++; } });
+    list.forEach(function (p) {
+      var d = AdminOffline.toDoc(p);
+      d.importedAt = FV.serverTimestamp(); d.editedBy = me;
+      b.set(db.collection('offline').doc(p.id), d); ops++;
+    });
+    if (ops > 490) return Promise.reject({ code: 'too-many' });
+    var log = {}; for (var k in entry) log[k] = entry[k];
+    log.at = FV.serverTimestamp();
+    b.set(db.collection('adminLog').doc(), log);
+    return b.commit().then(applyLocal);
+  }
+  function offlineFail(e) {
+    var c = (e && e.code) || '';
+    toast(c === 'too-many' ? '기록이 너무 많아 한 번에 올릴 수 없어요 (490명까지)' : failText(e));
+  }
+
+  function importOffline(file) {
+    if (file.size > 1024 * 1024) { toast('파일이 너무 커요 (1MB 이하)'); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      var list;
+      try { list = AdminOffline.parse(String(rd.result)); }
+      catch (e) { toast('올리지 못했어요 — ' + (e && e.message ? e.message : '형식을 확인해 주세요')); return; }
+      var had = state.offline ? state.offline.length : 0;
+      var reason = prompt(list.length + '명의 현장 기록을 올릴까요?' + (had ? '\n지금 있는 ' + had + '명의 기록은 이 파일 내용으로 바뀌어요.' : '') + '\n올리는 이유를 적어 주세요', '현장에서 모은 기록 올리기');
+      if (reason === null) return;
+      if (!reason.trim()) { toast('이유를 적어야 올릴 수 있어요'); return; }
+      writeOffline(list, { action: 'importOffline', target: 'offline', before: { people: had }, after: { people: list.length }, reason: reason.trim().slice(0, 200) })
+        .then(function () { render(); toast(list.length + '명의 기록을 올렸어요'); }, offlineFail);
+    };
+    rd.readAsText(file, 'utf-8');
+  }
+
+  function clearOffline() {
+    var had = state.offline ? state.offline.length : 0;
+    var reason = prompt('현장 기록 ' + had + '명을 모두 지울까요?\n지운 기록은 되돌릴 수 없어요(파일을 다시 올리면 돼요). 지우는 이유를 적어 주세요');
+    if (reason === null) return;
+    if (!reason.trim()) { toast('이유를 적어야 지울 수 있어요'); return; }
+    writeOffline([], { action: 'deleteOffline', target: 'offline', before: { people: had }, after: null, reason: reason.trim().slice(0, 200) })
+      .then(function () { render(); toast('지웠어요'); }, offlineFail);
+  }
+
+  /* =========================================================
      탭 ④ 설정 (8절 — 팀이 정할 것)
      ========================================================= */
   function settingsHtml(x) {
@@ -670,6 +812,7 @@ var AdminView = (function () {
         f('cf-growth', '햇빛 시간 늘리기 목표 (%)', c.growth, 'number', '첫 주보다 마지막 주에 몇 % 늘면 목표 달성인지') +
         '<div class="ad-form-f"><button class="ad-btn" id="cf-save">저장</button><button class="ad-link" id="cf-reset">처음 값으로</button></div>' +
       '</section>' +
+      offlineCardHtml() +
       (state.mode === 'demo' ? '<p class="ad-muted">예시 데이터는 2026-10-05부터 4주로 만들어졌어요. 시작일을 비우면 이 기간을 써요.</p>' : '');
   }
 
@@ -684,6 +827,7 @@ var AdminView = (function () {
       var done = function () {
         state.mode = null; state.users = []; state.sessions = []; state.error = null;
         state.log = []; state.sel = state.edit = state.merge = null;
+        state.offline = null; state.offlineErr = false;
         render();
       };
       /* 실제 기록을 보던 중이면 로그아웃하고 앱 첫 화면으로 — 앱은 다시 게스트로 시작한다 */
@@ -693,6 +837,8 @@ var AdminView = (function () {
     if ($('ad-reload')) $('ad-reload').onclick = fetchLive;
     if ($('ad-csv')) $('ad-csv').onclick = exportCsv;
     if (state.tab === 'manage') bindManage();
+    if ($('of-file')) $('of-file').onchange = function () { var f = this.files && this.files[0]; this.value = ''; if (f) importOffline(f); };
+    if ($('of-clear')) $('of-clear').onclick = clearOffline;
 
     if ($('cf-save')) {
       $('cf-save').onclick = function () {
