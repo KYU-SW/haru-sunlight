@@ -9,3 +9,6 @@ Thumbs.db
 .wrangler/
 node_modules/
 .dev.vars
+
+# Firebase 에뮬레이터 로그
+*-debug.log

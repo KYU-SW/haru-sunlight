@@ -1,8 +1,9 @@
-# 자동 테스트 — 어느 브랜치든 올라오면 헤드리스 크롬으로 두 테스트 페이지를 돌린다.
-#   tests/smoke.html        계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (단위)
-#   tests/integration.html  실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의)
+# 자동 테스트 — 어느 브랜치든 올라오면 세 가지를 돌린다.
+#   tests/smoke.html        계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (단위, 헤드리스 크롬)
+#   tests/integration.html  실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의, 헤드리스 크롬)
+#   tests/firestore/        firestore.rules 를 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)로 검사
 # 결과는 이 실행의 Summary 탭에 표로 남고, 하나라도 FAIL이면 실행이 실패(빨간 X)로 표시된다.
-# 실제 기상청 · Firebase는 부르지 않는다 — 비밀값이 필요 없다.
+# 실제 기상청 · Firebase 프로젝트는 부르지 않는다 — 비밀값이 필요 없다 (에뮬레이터는 demo- 프로젝트).
 name: Test
 
 on:
@@ -50,3 +51,39 @@ jobs:
             fi
           done
           exit $status
+
+  firestore-rules:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests/firestore
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4       # Firestore 에뮬레이터는 Java가 필요하다
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: 설치
+        run: npm install --no-audit --no-fund
+
+      - name: Firestore 에뮬레이터로 보안 규칙 검사
+        run: |
+          set +e
+          npm test 2>&1 | tee /tmp/rules.log
+          code=${PIPESTATUS[0]}
+          pass=$(grep -oE '^# pass [0-9]+' /tmp/rules.log | grep -oE '[0-9]+' | tail -1)
+          fail=$(grep -oE '^# fail [0-9]+' /tmp/rules.log | grep -oE '[0-9]+' | tail -1)
+          {
+            echo "## Firestore 보안 규칙 (Firebase 에뮬레이터)"
+            echo ""
+            echo "| 테스트 | 결과 |"
+            echo "|---|---|"
+            echo "| \`tests/firestore/rules.test.mjs\` → \`firestore.rules\` | 결과: ${pass:-0} PASS / ${fail:-0} FAIL |"
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit $code
