@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>live</title>
+<style>
+  body { font: 14px/1.6 -apple-system, 'Pretendard', sans-serif; margin: 24px; color: #131A2B; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #5B6478; margin-bottom: 14px; }
+  table { border-collapse: collapse; margin-top: 10px; }
+  th, td { border-bottom: 1px solid #E3ECFF; padding: 6px 10px; text-align: left; vertical-align: top; }
+  th { color: #5B6478; font-weight: 600; }
+  .ok { color: #326CF9; font-weight: 700; }
+  .ng { background: #E3ECFF; font-weight: 800; padding: 0 4px; }
+  #sum { font-size: 16px; font-weight: 800; }
+</style>
+</head><body>
+<h1>실제 기상청 API 연결 확인</h1>
+<div class="sub">배포된 앱과 같은 경로(서비스키 또는 중계 서버)로 <b>진짜 기상청 예보</b>를 받아, 앱 계산까지 돌려 본다.
+Firebase · 기기 저장소에는 아무것도 쓰지 않는다. 배포 사이트: <code>/tests/live.html</code></div>
+<div id="sum">받는 중…</div>
+<div id="out"></div>
+
+<script src="../config.js"></script>
+<script src="../config.local.js"></script>
+<script src="../core/solar.js"></script>
+<script src="../core/engine.js"></script>
+<script src="../core/store.repo.js"></script>
+<script src="../core/kma.geo.js"></script>
+<script src="../core/providers/kma.provider.js"></script>
+<script src="../shared/ui.js"></script>
+<script src="../core/prescription.js"></script>
+<script>
+var CITIES = [
+  { name: '서울', lat: 37.5665, lon: 126.9780 },
+  { name: '부산', lat: 35.1796, lon: 129.0756 },
+  { name: '제주', lat: 33.4996, lon: 126.5312 }
+];
+var PROFILE = { skinType: 3, clothing: 'shortShort', spf: 1, useCircadian: true, wakeTime: '07:00', supplement: false };
+var key = (window.KMA_SERVICE_KEY || '').trim(), proxy = (window.KMA_PROXY_URL || '').trim();
+var pass = 0, fail = 0, rows = [];
+function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+function mark(c) { c ? pass++ : fail++; return c ? '<span class="ok">PASS</span>' : '<span class="ng">FAIL</span>'; }
+
+function one(city) {
+  var t0 = performance.now();
+  return KmaProvider.load(city, key, proxy).then(function (w) {
+    var ms = Math.round(performance.now() - t0);
+    var day = w.days[0], hourly = day.hourly || [];
+    var maxUv = hourly.reduce(function (m, h) { return Math.max(m, h.uvi || 0); }, 0);
+    var temps = hourly.map(function (h) { return h.tempC; }).filter(function (v) { return typeof v === 'number'; });
+    var rx = Prescription.forToday(w, city, PROFILE);
+    var okData = day.date && hourly.length >= 6 && temps.length >= 6;
+    var okRx = rx && rx.mode && rx.mode.id;
+    rows.push('<tr><td><b>' + city.name + '</b></td>' +
+      '<td>' + mark(okData) + ' ' + esc(day.date) + ' · 시간별 ' + hourly.length + '칸<br>최고 기온 ' + Math.max.apply(null, temps) + '℃ · 최고 자외선지수 ' + maxUv.toFixed(1) + '</td>' +
+      '<td>' + mark(!!okRx) + ' 모드 ' + esc(okRx || '–') + ' · 햇빛 시간 창 ' + (rx ? rx.windows.length : 0) + '개' +
+        (rx && rx.windows[0] ? '<br>' + esc(rx.windows[0].timeText) + ' · ' + rx.windows[0].minutes + '분' : '') + '</td>' +
+      '<td>' + ms + 'ms</td></tr>');
+  }).catch(function (e) {
+    fail++;
+    rows.push('<tr><td><b>' + city.name + '</b></td><td colspan="3"><span class="ng">FAIL</span> ' + esc((e && e.message) || e) + '</td></tr>');
+  });
+}
+
+(function run(i) {
+  if (i < CITIES.length) return one(CITIES[i]).then(function () { run(i + 1); });
+  var via = key ? '기상청 직접 (서비스키)' : proxy ? '중계 서버 ' + proxy : '경로 없음 — 키 · 중계 서버 둘 다 없음';
+  document.getElementById('sum').textContent = '결과: ' + pass + ' PASS / ' + fail + ' FAIL';
+  document.title = fail ? 'FAIL ' + fail : 'ALL PASS ' + pass;
+  document.getElementById('out').innerHTML =
+    '<div class="sub" style="margin-top:8px">받은 경로: ' + esc(via) + ' · 확인 시각 ' + new Date().toLocaleString('ko-KR') + '</div>' +
+    '<table><tr><th>지역</th><th>받은 예보</th><th>앱 계산 결과 (피부 3형 · 반팔 반바지)</th><th>응답</th></tr>' + rows.join('') + '</table>';
+})(0);
+</script>
+</body></html>

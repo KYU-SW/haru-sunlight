@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>harness</title>
+<link rel="stylesheet" href="../css/style.css">
+</head><body>
+<!-- 통합 테스트용 앱 틀 (tests/integration.html이 iframe으로 연다)
+     실제 index.html의 화면과 스크립트를 그대로 불러오되, 바깥으로 나가는 것만 가짜로 바꾼다.
+       · localStorage  → 메모리 저장소 (실제 앱 기록을 건드리지 않는다)
+       · fetch         → 기상청 응답 모양 그대로의 모의 데이터 (실패 · 비 · 폭염도 흉내)
+       · firebase      → 가짜 인증 · Firestore (쓴 문서를 기록해 두고 검사한다)
+       · 시계          → 오늘 오전 10시 30분으로 고정 (언제 돌려도 같은 결과)
+     쿼리: ?uvi=7&temp=26&rain=0&kma=ok|fail&cache=0|1&state=fresh|ready|noconsent&fb=1|0|fail&hour=10.5 -->
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var P = {
+    uvi: +(q.get('uvi') || 7), temp: +(q.get('temp') || 26), rain: q.get('rain') === '1',
+    kma: q.get('kma') || 'ok', cache: q.get('cache') === '1',
+    state: q.get('state') || 'ready', fb: q.get('fb') || '1', hour: +(q.get('hour') || 10.5)
+  };
+  window.__P = P;
+
+  /* ---------- 1. 메모리 localStorage ---------- */
+  var mem = {};
+  var fakeStorage = {
+    getItem: function (k) { return Object.prototype.hasOwnProperty.call(mem, k) ? mem[k] : null; },
+    setItem: function (k, v) { mem[k] = String(v); },
+    removeItem: function (k) { delete mem[k]; },
+    clear: function () { mem = {}; },
+    key: function (i) { return Object.keys(mem)[i] || null; },
+    get length() { return Object.keys(mem).length; }
+  };
+  Object.defineProperty(window, 'localStorage', { value: fakeStorage, configurable: true });
+
+  /* ---------- 2. 시계 고정 — 오늘 P.hour 시 ---------- */
+  var RD = Date, base = new RD(); base.setHours(Math.floor(P.hour), Math.round((P.hour % 1) * 60), 0, 0);
+  var OFF = base.getTime() - RD.now();
+  function FD() {
+    var a = [].slice.call(arguments);
+    if (!(this instanceof FD)) return new RD(RD.now() + OFF).toString();
+    if (!a.length) return new RD(RD.now() + OFF);
+    return new (Function.prototype.bind.apply(RD, [null].concat(a)))();
+  }
+  FD.prototype = RD.prototype; FD.now = function () { return RD.now() + OFF; };
+  FD.UTC = RD.UTC; FD.parse = RD.parse;
+  window.Date = FD;
+
+  /* ---------- 3. 기상청 모의 응답 ---------- */
+  var p2 = function (n) { return n < 10 ? '0' + n : '' + n; };
+  var now = new FD(), ymd = '' + now.getFullYear() + p2(now.getMonth() + 1) + p2(now.getDate());
+  var calls = window.__kmaCalls = [];
+  function kmaJson(items) { return { response: { header: { resultCode: '00', resultMsg: 'NORMAL_SERVICE' }, body: { items: { item: items } } } }; }
+  function fcstItems() {
+    var out = [];
+    for (var h = 0; h < 24; h++) {
+      var s = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+      var t = { fcstDate: ymd, fcstTime: p2(h) + '00' };
+      out.push(Object.assign({ category: 'TMP', fcstValue: (P.temp - 8 + 8 * s).toFixed(1) }, t));
+      out.push(Object.assign({ category: 'REH', fcstValue: (P.temp >= 33 ? 70 : 60 - 20 * s).toFixed(0) }, t));
+      out.push(Object.assign({ category: 'PTY', fcstValue: P.rain && h >= 6 && h <= 20 ? '1' : '0' }, t));
+    }
+    return out;
+  }
+  function uvItem(timeParam) {
+    var bh = +String(timeParam).slice(8, 10);
+    var it = { areaNo: '1100000000', date: timeParam };
+    for (var h = 0; h <= 75; h += 3) {
+      var hod = (bh + h) % 24;
+      it['h' + h] = Math.max(0, P.uvi * Math.sin((hod - 6) / 12 * Math.PI)).toFixed(1);
+    }
+    return it;
+  }
+  window.fetch = function (url) {
+    url = String(url);
+    calls.push(url);
+    var body;
+    if (P.kma === 'fail') return Promise.reject(new TypeError('Failed to fetch (모의 네트워크 오류)'));
+    if (url.indexOf('getVilageFcst') >= 0 || url.indexOf('/fcst') >= 0) body = kmaJson(fcstItems());
+    else if (url.indexOf('getUVIdx') >= 0 || url.indexOf('/uv') >= 0) body = kmaJson([uvItem(new URL(url, location.href).searchParams.get('time'))]);
+    else return Promise.reject(new Error('테스트에서 막은 요청: ' + url));
+    var txt = JSON.stringify(body);
+    return Promise.resolve({ ok: true, status: 200, text: function () { return Promise.resolve(txt); }, json: function () { return Promise.resolve(JSON.parse(txt)); } });
+  };
+
+  /* ---------- 4. 가짜 Firebase ---------- */
+  var writes = window.__fsWrites = [];     // {path, data, opts}
+  var docs = window.__fsDocs = {};
+  var failLeft = P.fb === 'fail' ? 1 : 0;  // 'fail' = 첫 번째 기록 쓰기 한 번만 실패 (네트워크 끊김 흉내)
+  if (P.fb !== '0') {
+    var user = null, listeners = [];
+    var authObj = {
+      setPersistence: function () { return Promise.resolve(); },
+      onAuthStateChanged: function (cb) { listeners.push(cb); setTimeout(function () { cb(user); }, 0); return function () {}; },
+      signInAnonymously: function () {
+        user = { uid: 'test-uid-0001', isAnonymous: true, email: null };
+        listeners.forEach(function (cb) { cb(user); });
+        return Promise.resolve({ user: user });
+      },
+      get currentUser() { return user; },
+      signOut: function () { user = null; return Promise.resolve(); }
+    };
+    function docRef(col, id) {
+      var path = col + '/' + id;
+      return {
+        set: function (data, opts) {
+          if (col === 'sessions' && failLeft > 0) { failLeft--; var e = new Error('unavailable'); e.code = 'unavailable'; return Promise.reject(e); }
+          writes.push({ path: path, data: data, opts: opts || null });
+          docs[path] = Object.assign({}, (opts && opts.merge && docs[path]) || {}, data);
+          return Promise.resolve();
+        },
+        get: function () { return Promise.resolve({ exists: !!docs[path], data: function () { return docs[path]; } }); }
+      };
+    }
+    var fs = function () { return { collection: function (c) { return { doc: function (id) { return docRef(c, id); } }; } }; };
+    fs.FieldValue = { serverTimestamp: function () { return { __ts: 'server' }; } };
+    fs.Timestamp = { fromMillis: function (ms) { return { __ms: ms }; } };
+    var authFn = function () { return authObj; };
+    authFn.Auth = { Persistence: { LOCAL: 'local' } };
+    window.firebase = { apps: [], initializeApp: function (c) { this.apps.push(c); return {}; }, auth: authFn, firestore: fs };
+    window.FIREBASE_CONFIG = { projectId: 'integration-test' };
+  } else {
+    window.FIREBASE_CONFIG = null;
+  }
+
+  /* ---------- 5. 시작 상태 심기 ---------- */
+  var NS = 'sunrx.';
+  if (P.state !== 'fresh') {
+    var prof = { onboarded: true, skinType: 3, clothing: 'shortShort', spf: 1, age: 22, heightCm: 168, weightKg: 60, notify: false };
+    if (P.state !== 'noconsent') prof.consent = { agreed: true, version: 'v2', at: RD.now() + OFF - 86400000 };
+    fakeStorage.setItem(NS + 'profile', JSON.stringify(prof));
+    fakeStorage.setItem(NS + 'location', JSON.stringify({ lat: 37.5665, lon: 126.9780, name: '서울', precise: false }));
+  }
+  /* 어제 받아 둔 같은 지역 캐시 — 기상청이 실패하면 이걸로 버틴다 */
+  if (P.cache) {
+    var hourly = [];
+    for (var h = 0; h < 24; h++) {
+      var s = Math.max(0, Math.sin((h - 6) / 12 * Math.PI));
+      hourly.push({ minuteOfDay: h * 60, uvi: +(P.uvi * s).toFixed(2), uviClear: null, tempC: +(P.temp - 8 + 8 * s).toFixed(1), rh: 50, feelsLike: null });
+    }
+    var dk = now.getFullYear() + '-' + p2(now.getMonth() + 1) + '-' + p2(now.getDate());
+    fakeStorage.setItem(NS + 'weather', JSON.stringify({
+      source: 'kma', fetchedAt: RD.now() + OFF - 6 * 3600000, dateKey: dk, utcOffsetSeconds: 9 * 3600, timezone: 'Asia/Seoul',
+      lat: 37.5665, lon: 126.9780,
+      days: [{ date: dk, hourly: hourly, sunrise: dk + 'T05:50', sunset: dk + 'T19:20' }]
+    }));
+  }
+
+  /* ---------- 6. 실제 index.html의 화면 · 스크립트 불러오기 ---------- */
+  var SKIP = /gstatic\.com|firebase-config\.js|config\.local\.js/;
+  var x = new XMLHttpRequest();     // index.html은 XHR로 읽는다 (fetch는 위에서 모의로 바꿨으므로)
+  x.open('GET', '../index.html');
+  x.onload = function () {
+    var doc = new DOMParser().parseFromString(x.responseText, 'text/html');
+    document.body.insertAdjacentHTML('beforeend', doc.querySelector('.phone').outerHTML);
+    [].forEach.call(document.querySelectorAll('.phone script'), function (s) { s.remove(); });
+    var srcs = [].map.call(doc.querySelectorAll('script[src]'), function (s) { return s.getAttribute('src'); })
+      .filter(function (s) { return !SKIP.test(s); });
+    (function next(i) {
+      if (i >= srcs.length) {
+        window.KMA_SERVICE_KEY = 'INTEGRATION-TEST-KEY';     // 기상청 직접 경로 — fetch가 모의라 실제로 나가지 않는다
+        window.__ready = true;
+        document.dispatchEvent(new Event('DOMContentLoaded'));
+        return;
+      }
+      var el = document.createElement('script');
+      el.src = '../' + srcs[i];
+      el.onload = function () { next(i + 1); };
+      el.onerror = function () { window.__loadError = srcs[i]; next(i + 1); };
+      document.body.appendChild(el);
+    })(0);
+  };
+  x.send();
+})();
+</script>
+</body></html>

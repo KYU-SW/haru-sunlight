@@ -1,0 +1,52 @@
+# 자동 테스트 — 어느 브랜치든 올라오면 헤드리스 크롬으로 두 테스트 페이지를 돌린다.
+#   tests/smoke.html        계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (단위)
+#   tests/integration.html  실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의)
+# 결과는 이 실행의 Summary 탭에 표로 남고, 하나라도 FAIL이면 실행이 실패(빨간 X)로 표시된다.
+# 실제 기상청 · Firebase는 부르지 않는다 — 비밀값이 필요 없다.
+name: Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Seoul          # 앱은 한국 시간 기준 — 날짜 · 시각 계산을 실제 사용 환경과 맞춘다
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 정적 서버 띄우기
+        run: |
+          python3 -m http.server 8762 --bind 127.0.0.1 >/tmp/server.log 2>&1 &
+          for i in $(seq 1 20); do curl -sf http://127.0.0.1:8762/index.html >/dev/null && break; sleep 0.5; done
+
+      - name: 헤드리스 크롬으로 테스트 실행
+        run: |
+          set -o pipefail
+          CHROME=$(command -v google-chrome || command -v chromium-browser || command -v chromium)
+          echo "브라우저: $($CHROME --version)"
+          echo "## 하루햇빛 자동 테스트" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| 테스트 | 결과 |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          status=0
+          for page in smoke integration; do
+            $CHROME --headless=new --no-sandbox --disable-gpu --no-first-run \
+              --user-data-dir="/tmp/chrome-$page" --virtual-time-budget=60000 \
+              --dump-dom "http://127.0.0.1:8762/tests/$page.html" > "/tmp/$page.html" 2>/dev/null || true
+            line=$(grep -o "결과: [0-9]* PASS / [0-9]* FAIL" "/tmp/$page.html" | head -1)
+            echo "$page — ${line:-결과 줄을 찾지 못함}"
+            echo "| \`tests/$page.html\` | ${line:-결과 없음} |" >> "$GITHUB_STEP_SUMMARY"
+            if [ -z "$line" ] || ! echo "$line" | grep -q "/ 0 FAIL"; then
+              status=1
+              # 실패한 항목만 로그에 남긴다
+              grep -o 'class="ng">FAIL</span>[^<]*' "/tmp/$page.html" | sed 's/class="ng">FAIL<\/span>/  FAIL/' || true
+            fi
+          done
+          exit $status
