@@ -17,12 +17,12 @@ concurrency:
   group: pages
   cancel-in-progress: true
 
+# 빌드(키 주입 · 업로드)와 배포를 두 작업으로 나눈다 — GitHub 공식 예제와 같은 구조.
+# 한 작업 안에서 업로드 직후 바로 배포하면, 방금 올린 artifact가 아직 목록에 안 잡혀
+# "No artifacts named github-pages" 로 실패하는 경우가 있었다(2026-11-23).
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
 
@@ -58,5 +58,12 @@ jobs:
         with:
           path: .
 
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - id: deployment
         uses: actions/deploy-pages@v4
