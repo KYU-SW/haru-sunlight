@@ -9,13 +9,18 @@
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html  
-**테스트 결과:** [자동 테스트(Actions)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) · [단위](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) · [통합](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) · [실제 기상청 연결](https://kyu-sw.github.io/haru-sunlight/tests/live.html) — 절차와 결과는 [`TESTING.md`](TESTING.md)
+**테스트 결과:** [자동 테스트(Actions)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) · [단위](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) · [통합](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) · [실제 기상청 연결](https://kyu-sw.github.io/haru-sunlight/tests/live.html) · [Firestore 규칙(에뮬레이터)](tests/firestore/rules.test.mjs) — 절차와 결과는 [`TESTING.md`](TESTING.md)
 
 <table><tr><td align="center"><img src="docs/images/home-sunny.png" width="220" alt="홈 — 오늘의 처방"><br><sub>홈 — 오늘의 처방</sub></td><td align="center"><img src="docs/images/timer.png" width="220" alt="타이머 — 남은 시간 · 충전률"><br><sub>타이머 — 남은 시간 · 충전률</sub></td><td align="center"><img src="docs/images/course-running.png" width="220" alt="회복 코스 — 오늘 할 일 · 기록"><br><sub>회복 코스 — 오늘 할 일 · 기록</sub></td></tr></table>
 
 ---
 
 ## 왜 만들었나요
+
+> **한 문단 요약** — 한국 성인 4명 중 3명 이상이 비타민D 부족이지만, 낮에 실내에 오래 있는 **20~30대 대학생 · 직장인**은
+> "오늘 몇 시에, 몇 분" 햇빛을 쬐면 되는지 알 방법이 없습니다. **일반 날씨 앱**은 자외선지수 숫자만 보여 주고,
+> **해외 비타민D 앱**은 한국 기상청 예보 · 폭염 기준 없이 계산하며, 둘 다 **꾸준히 하게 돕는 장치**가 없습니다.
+> 하루햇빛은 기상청 예보와 내 피부 · 옷차림으로 **오늘의 처방**을 내고, **8주 · 12주 회복 코스**로 그것을 습관으로 만듭니다.
 
 **한국 성인 4명 중 3명 이상이 비타민D 부족입니다.** 국민건강영양조사(2014)에서 혈중 비타민D가 부족(20 ng/mL 미만)한 사람은
 남성 75.2%, 여성 82.5%였고, 2008년보다 더 늘었습니다 (Park 외 2018, *Medicine* 97(26):e11032).
@@ -98,6 +103,27 @@ flowchart LR
 
 ### 오류가 나면 어떻게 되나요
 
+```mermaid
+flowchart TD
+  S(["앱 열기 · 새로고침"]) --> K{"기상청 예보 받기"}
+  K -->|"성공"| C1["기기에 캐시 (1시간)"] --> RX["오늘의 처방 계산"]
+  K -->|"최신 발표 없음"| RB["직전 발표 시각으로<br/>2~3번 다시 요청"] --> K
+  K -->|"실패 · 네트워크 끊김"| HC{"같은 지역 캐시가 있나?"}
+  HC -->|"있음"| ST["캐시로 계산<br/>'오래된 자료' 표시"] --> RX
+  HC -->|"없음"| ER["안내 화면<br/>(마이페이지 · 회복 코스는 그대로 열림)"]
+  RX --> T["타이머 · 기록"] --> L[("기기에 먼저 저장")]
+  L --> CO{"수집 동의 했나?"}
+  CO -->|"아니요"| NO["업로드 안 함"]
+  CO -->|"예"| FB{"Firebase 불러왔나?"}
+  FB -->|"아니요"| OFF["업로드만 끄고 앱은 그대로"]
+  FB -->|"예"| UP{"Firestore에 올리기<br/>(15초 제한)"}
+  UP -->|"성공"| MK["올린 목록에 기록<br/>→ 다시 올리지 않음"]
+  UP -->|"실패"| RT["남겨 두고 다음 기회에 다시<br/>(앱 열기 · 타이머 종료 · 온라인 복귀)"]
+  UP -->|"규칙 거절<br/>(이미 있는 문서)"| EX{"서버에 이미 있나?"}
+  EX -->|"있음"| MK
+  EX -->|"없음"| RT
+```
+
 | 상황 | 앱의 동작 | 코드 | 통합 테스트 |
 |---|---|---|---|
 | 기상청 응답 실패 · 네트워크 끊김 | 같은 지역 캐시가 있으면 그걸로 계산하고 '오래된 자료' 표시, 없으면 안내 화면 (마이페이지 · 회복 코스는 그대로 열림) | `core/weather.api.js` `load()` | 시나리오 6 · 7 |
@@ -123,7 +149,9 @@ flowchart LR
 
 - **보내지 않는 것:** 이름 · 이메일 · 좌표 · 시군구 · 나이 · 키 · 몸무게 원값 (나이는 연령대, 키 · 몸무게는 BMI 구간으로만). 규칙이 목록에 없는 칸을 거절합니다.
 - **중복 · 조작 방지:** 문서 ID가 `uid_시각` 형식이 아니면 거절, 한 번 올린 기록은 참가자가 고칠 수 없음, 글자 칸은 형식 · 길이 검사(통계 오염 · CSV 수식 주입 방지).
-- 위 4개 외 경로는 전부 막혀 있습니다. 업로드 내용은 통합 테스트 시나리오 2가 실제로 검사합니다.
+- 위 4개 외 경로는 전부 막혀 있습니다.
+- **검증:** 규칙은 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)에서 23가지 경우로 검사하고(`tests/firestore/`, 푸시마다 자동),
+  앱이 실제로 보내는 문서 모양은 통합 테스트 시나리오 2가 검사합니다. 실제 Firebase 프로젝트는 테스트에 쓰지 않습니다.
 
 ## 팀 · 기여
 
@@ -189,6 +217,7 @@ python -m http.server 8762
 | `tests/smoke.html` | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
 | `tests/integration.html` | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의) |
 | `tests/live.html` | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 (배포 사이트에서 열기) |
+| `tests/firestore/` | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 23가지 검사 (`npm test`, Java 21 필요) |
 | `tests/timer-running.html` | 타이머가 돌아가는 상태 확인 |
 
 ## 폴더 구조
