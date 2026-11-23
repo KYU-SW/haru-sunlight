@@ -5,7 +5,6 @@
    화면 흐름
      코스 고르기(카드 2장) → 카드를 누르면 그 코스의 소개(왜 8주 / 왜 12주, 애니메이션)
      → 마지막 장에서 시작 → 진행 중(오늘 할 일 · 진행 · 기록) → 끝(첫 2주 vs 마지막 2주)
-   홈의 코스 카드도 이 탭으로 들어온다.
    ========================================================= */
 var CourseService = (function () {
 
@@ -92,42 +91,6 @@ var CourseView = (function () {
   }
 
   function weekText(m) { return m.type.weekly ? '이번 주 <b>' + m.weekDone + '</b>/' + m.weekGoal + '번' : '이번 주 <b>' + m.weekDone + '</b>/7'; }
-
-  /* ---------- 홈 카드 — 하는 코스마다 하나 ---------- */
-  function homeCard() {
-    return CourseService.models().map(oneHomeCard).join('');
-  }
-  function oneHomeCard(m) {
-    var id = m.type.id;
-    if (m.finished) {
-      return '<button class="ha-t cs-home cs-home-go" data-type="' + id + '">' +
-        '<div class="cs-home-h"><span class="ha-lab">회복 코스</span>' + UI.ICON.right + '</div>' +
-        '<div class="cs-home-t">' + m.type.name + '를 마쳤어요 · <b>결과 보기</b></div>' +
-      '</button>';
-    }
-    var t = m.today, ms = mission(m);
-    var canCheck = t.kind === 'light' && t.state !== 'done' && !(m.type.weekly && m.weekMet);
-    return '<section class="ha-t cs-home">' +
-      '<button class="cs-home-h cs-home-go" data-type="' + id + '"><span class="ha-lab">' + m.type.name + ' · ' + m.week + '주차</span>' +
-        '<span class="cs-home-v">' + weekText(m) + UI.ICON.right + '</span></button>' +
-      '<div class="cs-home-t' + (t.state === 'done' ? ' done' : '') + '">' + ms.title + '</div>' +
-      '<div class="cs-home-b">' + ms.body + '</div>' +
-      (canCheck ? '<button class="ha-cta cs-check cs-home-check">다녀왔어요</button>' : '') +
-    '</section>';
-  }
-
-  function bindHome() {
-    [].forEach.call(document.querySelectorAll('#screen-home .cs-home-go'), function (b) {
-      b.onclick = function () { showType = b.dataset.type; open(); };
-    });
-    [].forEach.call(document.querySelectorAll('#screen-home .cs-home-check'), function (b) {
-      b.onclick = function () {
-        CourseService.checkLight(true);
-        UI.toast('체크했어요. 오늘 할 일 끝!');
-        App.refreshView();
-      };
-    });
-  }
 
   /* =========================================================
      코스별 내용 — 카드 · 소개(왜 이 기간인지) · 근거 시트
@@ -541,5 +504,5 @@ var CourseView = (function () {
     }
   }
 
-  return { open: open, render: render, homeCard: homeCard, bindHome: bindHome };
+  return { open: open, render: render };
 })();

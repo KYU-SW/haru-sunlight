@@ -119,7 +119,7 @@ var SCENARIOS = [
       w.App.go('course');
       ok('회복 코스 탭에 오늘 할 일 완료가 보인다', /오늘 할 일을 마쳤어요/.test(txt(w, '#screen-course')));
       w.App.go('home');
-      ok('홈의 코스 카드도 같이 바뀐다', /오늘 할 일을 마쳤어요/.test(txt(w, '#screen-home .cs-home')));
+      ok('홈에는 회복 코스 카드가 없다 (회복 코스 탭에서만)', !w.document.querySelector('#screen-home .cs-home'));
     });
   }],
 
@@ -275,7 +275,7 @@ var SCENARIOS = [
       w.document.getElementById('c-check').click();
       ok('"다녀왔어요" 한 번이면 두 코스 모두 오늘 칸이 채움', w.CourseService.model('daily8').today.state === 'done' && w.CourseService.model('load12').today.state === 'done');
       w.App.go('home');
-      ok('홈에 코스 카드 2장', w.document.querySelectorAll('#screen-home .cs-home').length === 2);
+      ok('홈은 그대로 — 코스 카드 없음', !w.document.querySelector('#screen-home .cs-home'));
       w.App.go('course'); w.document.querySelector('#screen-course .cs-seg-b[data-show="daily8"]').click();
       w.document.getElementById('c-stop').click(); w.document.getElementById('c-stop-yes').click();
       ok('하나만 그만두면 다른 코스는 그대로', w.CourseService.list().join(',') === 'load12');
