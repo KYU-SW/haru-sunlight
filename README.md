@@ -2,7 +2,7 @@
 
 > 오늘 **언제, 몇 분** 햇빛을 쬐면 비타민D를 채울 수 있는지 알려 주는 웹앱
 
-`v_2.0` · 회복 코스 탭 (8주 · 12주)
+`v_2.1` · 회복 코스 탭 (8주 · 12주) · 관리자 대시보드 현장 기록
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html
