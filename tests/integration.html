@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>integration</title>
+<style>
+  body { font: 14px/1.6 -apple-system, 'Pretendard', sans-serif; margin: 24px; color: #131A2B; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: #5B6478; margin-bottom: 18px; }
+  .sc { margin: 18px 0 6px; font-weight: 800; }
+  .sc small { font-weight: 500; color: #8E96A8; margin-left: 6px; }
+  .r { padding: 2px 0; }
+  .ok { color: #326CF9; font-weight: 700; }
+  .ng { color: #131A2B; background: #E3ECFF; font-weight: 800; padding: 0 4px; }
+  .d { color: #8E96A8; margin-left: 6px; }
+  #sum { font-size: 16px; font-weight: 800; margin: 10px 0 0; }
+  iframe { position: absolute; left: -9999px; width: 390px; height: 844px; border: 0; }
+</style>
+</head><body>
+<h1>하루햇빛 통합 테스트</h1>
+<div class="sub">실제 앱 화면(index.html)을 그대로 띄우고, 기상청 · Firebase만 모의로 바꿔 사용자 흐름을 끝까지 돌린다.
+실제 서버로는 아무 요청도 나가지 않는다. 각 시나리오는 새 iframe(빈 저장소)에서 시작한다.</div>
+<div id="sum">실행 중…</div>
+<div id="out"></div>
+
+<script>
+/* =========================================================
+   시나리오마다 tests/harness.html?… 을 iframe으로 열고, 앱이 뜬 뒤 안쪽을 검사한다.
+   결과 줄: "결과: N PASS / M FAIL" — GitHub Actions(.github/workflows/test.yml)가 이 줄을 읽는다.
+   ========================================================= */
+var out = document.getElementById('out'), pass = 0, fail = 0;
+function esc(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+function head(t, d) { out.insertAdjacentHTML('beforeend', '<div class="sc">' + esc(t) + '<small>' + esc(d || '') + '</small></div>'); }
+function ok(name, cond, detail) {
+  cond ? pass++ : fail++;
+  out.insertAdjacentHTML('beforeend', '<div class="r"><span class="' + (cond ? 'ok">PASS' : 'ng">FAIL') + '</span> ' + esc(name) +
+    (detail != null ? '<span class="d">' + esc(detail) + '</span>' : '') + '</div>');
+}
+function sleep(ms) { return new Promise(function (r) { setTimeout(r, ms); }); }
+function until(fn, ms) {
+  var t0 = Date.now();
+  return new Promise(function (res, rej) {
+    (function poll() {
+      var v; try { v = fn(); } catch (e) { v = false; }
+      if (v) return res(v);
+      if (Date.now() - t0 > (ms || 8000)) return rej(new Error('시간 초과'));
+      setTimeout(poll, 50);
+    })();
+  });
+}
+function openApp(qs) {
+  return new Promise(function (res, rej) {
+    var f = document.createElement('iframe');
+    f.src = 'harness.html?' + qs + '&t=' + Date.now();
+    f.onload = function () {
+      until(function () { return f.contentWindow.__ready; }, 10000)
+        .then(function () { return sleep(150); })
+        .then(function () { res(f); }, rej);
+    };
+    document.body.appendChild(f);
+  });
+}
+function close(f) { f.remove(); }
+function txt(w, sel) { var e = w.document.querySelector(sel); return e ? e.textContent.replace(/\s+/g, ' ').trim() : ''; }
+function shown(w, sel) { var e = w.document.querySelector(sel); return !!(e && e.offsetParent !== null || (e && w.getComputedStyle(e).display !== 'none' && e.classList.contains('show'))); }
+function ls(w, k) { try { return JSON.parse(w.localStorage.getItem('sunrx.' + k)); } catch (e) { return null; } }
+function loaded(w) { return until(function () { return w.App && w.App.state && !w.App.state.loading; }, 8000); }
+
+var SCENARIOS = [
+
+  ['1. 처음 연 사람', 'state=fresh', function (w) {
+    return sleep(300).then(function () {
+      ok('시작(로그인) 화면이 뜬다', w.document.getElementById('login').classList.contains('show'));
+      ok('온보딩 전에는 기상청을 부르지 않는다', w.__kmaCalls.length === 0, w.__kmaCalls.length + '회');
+      ok('온보딩 전에는 Firestore에 아무것도 쓰지 않는다', w.__fsWrites.length === 0);
+    });
+  }],
+
+  ['2. 맑은 날 — 처방 → 타이머 → 기록 → 업로드 → 회복 코스', 'uvi=7&temp=26', function (w) {
+    var rx;
+    return loaded(w).then(function () {
+      var fc = w.__kmaCalls.filter(function (u) { return /getVilageFcst/.test(u); }).length;
+      var uv = w.__kmaCalls.filter(function (u) { return /getUVIdx/.test(u); }).length;
+      ok('기상청 단기예보 · 자외선지수 두 API를 부른다', fc >= 1 && uv >= 1, '예보 ' + fc + '회 · 자외선 ' + uv + '회');
+      ok('서울 격자 좌표(nx=60, ny=127)로 요청한다', w.__kmaCalls.some(function (u) { return /nx=60&ny=127/.test(u); }));
+      ok('받은 예보를 기기에 캐시한다', !!ls(w, 'weather') && ls(w, 'weather').days.length >= 1);
+      rx = w.App.prescription();
+      ok('오늘 처방이 계산된다 (햇빛 시간 창 1개 이상)', rx && rx.windows.length >= 1, rx && rx.windows.length + '개 창');
+      ok('홈에 처방 카드와 타이머 버튼이 그려진다', !!w.document.querySelector('#screen-home .ha-hero') && !!w.document.getElementById('h-cta'),
+         txt(w, '#screen-home .ha-big'));
+      /* 타이머 — 10분 쬔 것으로 시간을 돌린다 */
+      w.TimerService.start(rx, rx.windows[0]);
+      var st = w.TimerService.session();
+      st.lastTick -= 10 * 60000; st.startedAt -= 10 * 60000; st.elapsedSec = 0;
+      w.TimerService.tick();
+      var r = w.TimerService.stop();
+      ok('타이머가 끝나면 기록이 남는다', w.Repo.getSessions().length === 1, r.minutes + '분 · ' + r.percent + '%');
+      ok('일별 충전률에 더해진다', (w.Repo.getDaily()[rx.dateKey] || 0) === r.percent, (w.Repo.getDaily()[rx.dateKey] || 0) + '%');
+      return until(function () { return w.__fsWrites.some(function (x) { return /^sessions\//.test(x.path); }); }, 5000);
+    }).then(function () {
+      var sess = w.__fsWrites.filter(function (x) { return /^sessions\//.test(x.path); });
+      var user = w.__fsWrites.filter(function (x) { return /^users\//.test(x.path); });
+      ok('익명 로그인 뒤 users/{uid} 문서를 쓴다', user.length >= 1 && user[0].path === 'users/test-uid-0001');
+      ok('타이머 기록이 sessions/{uid}_{시각} 으로 올라간다', sess.length === 1 && /^sessions\/test-uid-0001_\d+$/.test(sess[0].path), sess[0] && sess[0].path);
+      var u = user[0].data, s = sess[0].data;
+      ok('사용자 문서 — 시 · 도만 보내고 좌표 · 지역명은 안 보낸다', u.sido === '서울' && !('lat' in u) && !('lon' in u) && !('name' in u), 'sido=' + u.sido);
+      ok('사용자 문서 — 나이 · 키 · 몸무게 원값 대신 구간만 (22세 → 20대, BMI 21 → 정상)', u.ageGroup === 20 && u.bmiGroup === 'normal' && !('age' in u) && !('heightCm' in u) && !('weightKg' in u),
+         'ageGroup=' + u.ageGroup + ' · bmiGroup=' + u.bmiGroup);
+      ok('사용자 문서 — 이메일을 담지 않는다', !JSON.stringify(u).match(/@/));
+      ok('기록 문서 — 규칙이 요구하는 칸만', Object.keys(s).sort().join(',') === 'at,clothing,dateKey,limitedBy,minutes,percent,uid,uploadedAt', Object.keys(s).sort().join(','));
+      return w.Sync.run();
+    }).then(function (n) {
+      ok('다시 돌려도 같은 기록을 두 번 올리지 않는다', n === 0 && w.__fsWrites.filter(function (x) { return /^sessions\//.test(x.path); }).length === 1);
+      /* 회복 코스 — 8주 코스를 시작하고 오늘 처방을 다 채운다 */
+      w.CourseService.start('daily8');
+      var m0 = w.CourseService.model();
+      ok('회복 코스 시작 — 오늘 할 일은 처방 채우기(vitd)', m0.started && m0.today.kind === 'vitd' && m0.dayN === 1);
+      w.HomeService.record(rx, { startedAt: Date.now(), minutes: 20, percent: 100, clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
+      var m1 = w.CourseService.model();
+      ok('처방을 100% 채우면 코스 오늘 칸이 채움이 된다', m1.today.state === 'done' && m1.weekDone === 1);
+      w.App.go('course');
+      ok('회복 코스 탭에 오늘 할 일 완료가 보인다', /오늘 할 일을 마쳤어요/.test(txt(w, '#screen-course')));
+      w.App.go('home');
+      ok('홈의 코스 카드도 같이 바뀐다', /오늘 할 일을 마쳤어요/.test(txt(w, '#screen-home .cs-home')));
+    });
+  }],
+
+  ['3. 겨울 (자외선지수 2 미만)', 'uvi=1.5&temp=4', function (w) {
+    return loaded(w).then(function () {
+      var rx = w.App.prescription();
+      ok('겨울 모드로 판정한다', rx.mode.id === 'winter', rx.mode.id);
+      ok('비타민D 햇빛 시간 창이 없다', rx.windows.length === 0);
+      w.CourseService.start('daily8');
+      ok('회복 코스 할 일 = 낮 바깥 빛(light)', w.CourseService.model().today.kind === 'light');
+      w.App.go('course');
+      ok('"다녀왔어요" 버튼이 뜨고, 비타민D를 만들기 어렵다고 말한다',
+         !!w.document.getElementById('c-check') && /비타민D는 잘 안 생겨요/.test(txt(w, '#screen-course')));
+      w.document.getElementById('c-check').click();
+      ok('체크하면 오늘 칸이 채움', w.CourseService.model().today.state === 'done');
+    });
+  }],
+
+  ['4. 비 오는 날 (낮 내내 강수)', 'uvi=7&temp=24&rain=1', function (w) {
+    return loaded(w).then(function () {
+      var rx = w.App.prescription();
+      ok('비 오는 시간은 햇빛 시간에서 뺀다 → 창 없음', rx.windows.length === 0, rx.mode.id);
+      w.CourseService.start('daily8');
+      ok('회복 코스는 쉬는 날(rest) — 달성률에서 빠진다', w.CourseService.model().today.kind === 'rest');
+    });
+  }],
+
+  ['5. 폭염 (체감 33℃ 이상)', 'uvi=9&temp=37', function (w) {
+    return loaded(w).then(function () {
+      var rx = w.App.prescription();
+      ok('폭염 모드로 판정한다', rx.mode.id === 'heat', rx.mode.id);
+      ok('남은 창은 오전뿐이다 (12시 이전 시작)', rx.windows.every(function (x) { return x.startMin < 12 * 60; }),
+         rx.windows.map(function (x) { return x.timeText; }).join(', ') || '창 없음');
+    });
+  }],
+
+  ['6. 기상청 장애 — 같은 지역 캐시가 있을 때', 'kma=fail&cache=1', function (w) {
+    return loaded(w).then(function () {
+      ok('앱이 멈추지 않고 캐시로 처방을 낸다', !!w.App.prescription() && !w.App.state.error);
+      ok('오래된 자료라는 표시(stale)를 켠다', w.App.state.stale === true);
+    });
+  }],
+
+  ['7. 기상청 장애 — 캐시도 없을 때', 'kma=fail&cache=0', function (w) {
+    return until(function () { return w.App && w.App.state && !w.App.state.loading; }, 8000).then(function () {
+      ok('오류 상태로 바뀌고 앱이 멈추지 않는다', !!w.App.state.error && !w.App.prescription());
+      ok('홈에 안내 화면이 그려진다 (빈 화면이 아님)', txt(w, '#screen-home').length > 10, txt(w, '#screen-home').slice(0, 30));
+      w.App.go('settings');
+      ok('마이페이지는 날씨 없이도 열린다', /마이페이지/.test(txt(w, '#screen-settings')));
+      w.App.go('course');
+      ok('회복 코스 탭도 날씨 없이 열린다 (코스 고르기)', w.document.querySelectorAll('#screen-course .cs-card').length === 2);
+    });
+  }],
+
+  ['8. Firebase를 못 불러왔을 때 (오프라인 우선)', 'fb=0', function (w) {
+    return loaded(w).then(function () {
+      ok('업로드 기능만 꺼지고 앱은 정상', w.Sync.available() === false && !!w.App.prescription());
+      var rx = w.App.prescription();
+      w.HomeService.record(rx, { startedAt: Date.now(), minutes: 8, percent: 60, clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
+      ok('기록은 기기에 먼저 남는다', w.Repo.getSessions().length === 1);
+    });
+  }],
+
+  ['9. 업로드가 한 번 실패했을 때', 'fb=fail', function (w) {
+    var rx;
+    return loaded(w).then(function () {
+      rx = w.App.prescription();
+      w.HomeService.record(rx, { startedAt: Date.now(), minutes: 8, percent: 60, clothing: 'shortShort', spf: 1, limitedBy: 'vitd' });
+      return sleep(400);
+    }).then(function () {
+      ok('실패한 기록은 올라가지 않고 남아 있다', w.__fsWrites.filter(function (x) { return /^sessions\//.test(x.path); }).length === 0);
+      return w.Sync.run();
+    }).then(function (n) {
+      ok('다음 기회에 다시 올린다', n === 1 && w.__fsWrites.filter(function (x) { return /^sessions\//.test(x.path); }).length === 1);
+    });
+  }],
+
+  ['10. 수집 동의를 안 한 사람', 'state=noconsent', function (w) {
+    return sleep(400).then(function () {
+      ok('동의 화면이 먼저 뜬다', w.document.getElementById('onboarding').classList.contains('show') && /시작하기 전에/.test(txt(w, '#onboarding')));
+      ok('동의 전에는 Firestore에 아무것도 쓰지 않는다', w.__fsWrites.length === 0);
+    });
+  }]
+];
+
+(function run(i) {
+  if (i >= SCENARIOS.length) {
+    var line = '결과: ' + pass + ' PASS / ' + fail + ' FAIL';
+    document.getElementById('sum').textContent = line + ' · 시나리오 ' + SCENARIOS.length + '개';
+    document.title = (fail ? 'FAIL ' + fail : 'ALL PASS ' + pass);
+    document.body.setAttribute('data-done', fail ? 'fail' : 'pass');
+    return;
+  }
+  var sc = SCENARIOS[i];
+  head(sc[0], sc[1]);
+  var frame;
+  openApp(sc[1]).then(function (f) {
+    frame = f;
+    if (f.contentWindow.__loadError) ok('스크립트 로드', false, f.contentWindow.__loadError);
+    return sc[2](f.contentWindow);
+  }).catch(function (e) {
+    ok('시나리오 실행', false, (e && e.message) || e);
+  }).then(function () {
+    if (frame) close(frame);
+    run(i + 1);
+  });
+})(0);
+</script>
+</body></html>
