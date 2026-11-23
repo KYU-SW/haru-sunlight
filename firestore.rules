@@ -19,7 +19,8 @@ service cloud.firestore {
     //      && request.auth.uid in ['여기에-관리자-UID']
     function isAdmin() {
       return signedIn()
-        && request.auth.token.get('email', '') in ['admin@haru-sunlight.firebaseapp.com'];
+        && request.auth.token.get('email', '') in ['admin@haru-sunlight.firebaseapp.com']
+        && request.auth.uid in ['FOBcvMHYlvOh1F9mMkzbVgWipyO2'];
     }
 
     match /users/{uid} {
