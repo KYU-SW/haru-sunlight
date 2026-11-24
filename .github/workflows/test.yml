@@ -1,6 +1,6 @@
 # 자동 테스트 — 어느 브랜치든 올라오면 세 가지를 돌린다.
 #   tests/smoke.html        계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (단위, 헤드리스 크롬)
-#   tests/integration.html  실제 앱 화면을 띄워 사용자 흐름 10가지 (기상청 · Firebase는 모의, 헤드리스 크롬)
+#   tests/integration.html  실제 앱 화면을 띄워 사용자 흐름 15가지 (기상청 · Firebase는 모의, 헤드리스 크롬)
 #   tests/firestore/        firestore.rules 를 Firebase 에뮬레이터(실제 Firestore 규칙 엔진)로 검사
 # 결과는 이 실행의 Summary 탭에 표로 남고, 하나라도 FAIL이면 실행이 실패(빨간 X)로 표시된다.
 # 실제 기상청 · Firebase 프로젝트는 부르지 않는다 — 비밀값이 필요 없다 (에뮬레이터는 demo- 프로젝트).

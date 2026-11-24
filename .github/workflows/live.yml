@@ -1,0 +1,62 @@
+# 실제 기상청 연결 확인 — 매일 09:00(한국 시간)과 main 배포 뒤에 자동으로 돌린다.
+# 배포 사이트의 tests/live.html 을 헤드리스 크롬으로 열어, 배포 앱과 같은 경로(서비스키 · 중계 서버)로
+# 서울 · 부산 · 제주의 진짜 예보를 받고 앱 계산까지 되는지 본다. 결과는 Summary 탭에 표로 남는다.
+# 기상청은 읽기만 한다 — Firebase · 기기 저장소에는 아무것도 쓰지 않는다. 비밀값이 필요 없다.
+name: Live KMA
+
+on:
+  schedule:
+    - cron: '0 0 * * *'       # UTC 00:00 = 한국 시간 09:00
+  workflow_run:
+    workflows: ['Deploy Pages']
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    env:
+      TZ: Asia/Seoul
+      URL: https://kyu-sw.github.io/haru-sunlight/tests/live.html
+    steps:
+      - name: 배포 사이트에서 실제 기상청 예보 받기
+        run: |
+          set -o pipefail
+          CHROME=$(command -v google-chrome || command -v chromium-browser || command -v chromium)
+          echo "브라우저: $($CHROME --version)"
+          line=""
+          for try in 1 2 3; do            # 기상청이 잠깐 느리면 두 번 더 해 본다
+            $CHROME --headless=new --no-sandbox --disable-gpu --no-first-run \
+              --user-data-dir="/tmp/chrome-live-$try" --virtual-time-budget=30000 \
+              --dump-dom "$URL?t=$(date +%s)" > /tmp/live.html 2>/dev/null || true
+            line=$(grep -o "결과: [0-9]* PASS / [0-9]* FAIL" /tmp/live.html | head -1)
+            echo "시도 $try — ${line:-결과 줄을 찾지 못함}"
+            if [ -n "$line" ] && echo "$line" | grep -q "/ 0 FAIL"; then break; fi
+            sleep 20
+          done
+          via=$(grep -o "받은 경로: [^·<]*" /tmp/live.html | head -1)
+          rows=$(python3 - <<'PY'
+          import re, html
+          s = open('/tmp/live.html', encoding='utf-8').read()
+          for tr in re.findall(r'<tr><td><b>(.*?)</tr>', s, re.S):
+              cells = [html.unescape(re.sub(r'<br>', ' · ', re.sub(r'<(?!br)[^>]+>', '', c))).strip()
+                       for c in re.split(r'</td>\s*<td[^>]*>', tr)]
+              print('| ' + ' | '.join(c.replace('|', '/') for c in cells).replace('</td>', '') + ' |')
+          PY
+          )
+          {
+            echo "## 실제 기상청 연결 (배포 사이트 tests/live.html)"
+            echo ""
+            echo "확인 시각: $(date '+%Y-%m-%d %H:%M') (한국 시간) · ${via:-받은 경로 모름}"
+            echo ""
+            echo "**${line:-결과 없음}**"
+            echo ""
+            echo "| 지역 | 받은 예보 | 앱 계산 결과 (피부 3형 · 반팔 반바지) | 응답 |"
+            echo "|---|---|---|---|"
+            echo "$rows"
+          } >> "$GITHUB_STEP_SUMMARY"
+          [ -n "$line" ] && echo "$line" | grep -q "/ 0 FAIL"

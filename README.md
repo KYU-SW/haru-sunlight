@@ -4,12 +4,26 @@
 
 [![Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml)
 [![Deploy Pages](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/deploy-pages.yml)
+[![Live KMA](https://github.com/KYU-SW/haru-sunlight/actions/workflows/live.yml/badge.svg)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/live.yml)
 
 `v_2.5` · 회복 코스 탭 (8주 · 12주 · 코스 추천) · 지난주 돌아보기 (평균 비교 · 한 줄 설문 · 이유에 맞춘 조치 → 효과 확인 → 다음 조치)
 
 **바로 써 보기:** https://kyu-sw.github.io/haru-sunlight/  
 **관리자 대시보드:** https://kyu-sw.github.io/haru-sunlight/admin.html (관리자 로그인 필요 · 로그인 없이 **예시 데이터로 보기** 가능)  
 **테스트 결과:** [자동 테스트(Actions)](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) · [단위](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) · [통합](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) · [실제 기상청 연결](https://kyu-sw.github.io/haru-sunlight/tests/live.html) · [Firestore 규칙(에뮬레이터)](tests/firestore/rules.test.mjs) — 절차와 결과는 [`TESTING.md`](TESTING.md)
+
+### 3분 안에 직접 확인하기 (설치 없이)
+
+| 순서 | 누를 곳 | 확인할 것 |
+|---|---|---|
+| 1 | [배포 앱](https://kyu-sw.github.io/haru-sunlight/) | 지역을 고르면 **오늘 기상청 예보로** 햇빛 시간 · 권장 분이 나온다 (게스트로 시작 가능) |
+| 2 | [실제 기상청 연결](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | 서울 · 부산 · 제주의 진짜 예보를 받아 앱 계산까지 — `결과: 6 PASS / 0 FAIL` |
+| 3 | [Actions › Live KMA](https://github.com/KYU-SW/haru-sunlight/actions/workflows/live.yml) | 같은 검사를 **매일 09:00와 배포 직후** 자동 실행한 기록 — 실행을 누르면 Summary에 지역별 예보 · 계산 결과 표 |
+| 4 | [Actions › Test](https://github.com/KYU-SW/haru-sunlight/actions/workflows/test.yml) | 푸시마다 단위 · 통합(헤드리스 크롬) · **Firebase 에뮬레이터**로 보안 규칙 검사 — Summary에 PASS / FAIL 수 |
+| 5 | [단위](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) · [통합](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | 브라우저에서 바로 다시 돌려 볼 수 있다 — 맨 위에 `결과: N PASS / 0 FAIL` |
+| 6 | [관리자 대시보드 › 예시 데이터로 보기](https://kyu-sw.github.io/haru-sunlight/admin.html) | 로그인 없이 지표(지연 시간 · 주별 쬔 시간 · 설문)가 어떻게 계산되는지 |
+
+로컬에서 돌리려면 저장소를 받아 `python -m http.server 8762` → `http://localhost:8762/tests/smoke.html` (자세한 절차는 [`TESTING.md`](TESTING.md)).
 
 <table><tr><td align="center"><img src="docs/images/home-sunny.png" width="220" alt="홈 — 오늘의 처방"><br><sub>홈 — 오늘의 처방</sub></td><td align="center"><img src="docs/images/timer.png" width="220" alt="타이머 — 남은 시간 · 충전률"><br><sub>타이머 — 남은 시간 · 충전률</sub></td><td align="center"><img src="docs/images/course-running.png" width="220" alt="회복 코스 — 오늘 할 일 · 기록"><br><sub>회복 코스 — 오늘 할 일 · 기록</sub></td></tr></table>
 
@@ -249,9 +263,9 @@ Firestore의 지난주 기록으로 계산해 `stats/latest`에 숫자 셋(인�
 |---|---|
 | `tests/seed.html?tab=home` (로컬 개발용) | 모의 날씨 · 기록을 넣고 바로 화면 확인 (`&uvi=9&temp=37` 처럼 조건 변경 가능) |
 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | **단위 테스트** — 계산 엔진 · 좌표 변환 · 기상청 응답 파싱 · 회복 코스 (전부 PASS 여야 함) |
-| [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 13가지 (기상청 · Firebase는 모의) |
-| [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 |
-| [`tests/firestore/`](tests/firestore/rules.test.mjs) | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 29가지 검사 (`npm test`, Java 21 필요) |
+| [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | **통합 테스트** — 실제 앱 화면을 띄워 사용자 흐름 15가지 (기상청 · Firebase는 모의) |
+| [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) | **실제 기상청 연결 확인** — 진짜 예보를 받아 앱 계산까지 (Actions `live.yml`이 매일 자동 실행) |
+| [`tests/firestore/`](tests/firestore/rules.test.mjs) | **Firestore 보안 규칙** — Firebase 에뮬레이터로 `firestore.rules` 31가지 검사 (`npm test`, Java 21 필요) |
 | `tests/timer-running.html` (로컬 개발용) | 타이머가 돌아가는 상태 확인 |
 
 ## 폴더 구조

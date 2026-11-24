@@ -53,7 +53,7 @@ function one(city) {
     rows.push('<tr><td><b>' + city.name + '</b></td>' +
       '<td>' + mark(okData) + ' ' + esc(day.date) + ' · 시간별 ' + hourly.length + '칸<br>최고 기온 ' + Math.max.apply(null, temps) + '℃ · 최고 자외선지수 ' + maxUv.toFixed(1) + '</td>' +
       '<td>' + mark(!!okRx) + ' 모드 ' + esc(okRx || '–') + ' · 햇빛 시간 창 ' + (rx ? rx.windows.length : 0) + '개' +
-        (rx && rx.windows[0] ? '<br>' + esc(rx.windows[0].timeText) + ' · ' + rx.windows[0].minutes + '분' : '') + '</td>' +
+        (rx && rx.windows[0] ? '<br>' + UI.hm(rx.windows[0].recommendStart) + '부터 ' + rx.windows[0].recommendMinutes + '분' : '') + '</td>' +
       '<td>' + ms + 'ms</td></tr>');
   }).catch(function (e) {
     fail++;
