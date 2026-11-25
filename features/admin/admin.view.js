@@ -22,6 +22,7 @@ var AdminView = (function () {
     users: [], sessions: [],
     log: [],               // 기록 관리 — 최근 변경 내역 (adminLog)
     sel: null,             // 기록 관리 — 기록을 보고 있는 참가자 uid
+    psel: null,            // 개인화 — 보고 있는 참가자 uid
     edit: null,            // 기록 관리 — { id } 고치는 중 / { id: null } 새로 넣는 중
     merge: null,           // 기록 관리 — 합칠 참가자 uid
     offline: null,         // 현장 기록 — 참가자별 요약 목록 (Firestore offline)
@@ -158,13 +159,13 @@ var AdminView = (function () {
           '</div>' +
         '</div>' +
         '<nav class="ad-tabs" role="tablist">' +
-          tabBtn('summary', '요약') + tabBtn('records', '타이머 기록') + tabBtn('manage', '기록 관리') + tabBtn('settings', '설정') +
+          tabBtn('summary', '요약') + tabBtn('records', '타이머 기록') + tabBtn('personal', '개인화') + tabBtn('manage', '기록 관리') + tabBtn('settings', '설정') +
         '</nav>' +
       '</header>' +
       '<main class="ad-main">' +
         (state.error === 'denied' ? '<div class="ad-note">이 계정은 관리자가 아니라서 기록을 볼 수 없어요.</div>' :
           state.error ? '<div class="ad-note">' + esc(state.error) + '</div>' : '') +
-        ({ summary: summaryHtml, records: recordsHtml, manage: manageHtml, settings: settingsHtml }[state.tab])(ctx) +
+        ({ summary: summaryHtml, records: recordsHtml, personal: personalHtml, manage: manageHtml, settings: settingsHtml }[state.tab])(ctx) +
       '</main>';
     bindMain(ctx);
   }
@@ -210,7 +211,7 @@ var AdminView = (function () {
     var d = AdminDemo.data();
     state.mode = 'demo'; state.users = d.users; state.sessions = d.sessions; state.surveys = d.surveys || []; state.error = null;
     state.sessions.forEach(function (x) { x._id = sid(x); });
-    state.log = []; state.sel = state.edit = state.merge = null;
+    state.log = []; state.sel = state.edit = state.merge = state.psel = null;
     render();
   }
 
@@ -352,22 +353,58 @@ var AdminView = (function () {
   }
 
   /* 못 쬔 이유 설문 (타이머 끝난 뒤 '지난주 돌아보기') — 가장 최근 주 이유별 응답 + 이유를 답한 다음 주 변화 */
-  /* ---------- 지난주 돌아보기 (개인화) — 사람별 ---------- */
+  /* =========================================================
+     탭 ③ 개인화 — 사람마다 다르게 쓰는 정보를 한곳에 (분석용 · 앱은 바뀌지 않는다)
+     · 위: 전체 — 이유별로 켠 조치가 얼마나 도움 됐나
+     · 가운데: 사람 명단 — 최근 답 → 조치 · 자주 빠지는 요일 · 주로 쬐는 시간대
+     · 아래: 고른 사람 — PERSONAL 목록의 칸을 차례로 그린다
+     새 개인화를 늘릴 때는 PERSONAL 에 { title, html(uid), brief(uid)? } 하나만 더 넣으면
+     사람 화면에 칸이, (brief 가 있으면) 명단에 열이 생긴다.
+     ========================================================= */
   var SV_NAME = { time: '시간이 없어서', forgot: '깜빡해서', weather: '날씨 탓', burn: '탈까 봐', lazy: '귀찮아서',
                   none: '다 채웠어요', helped: '도움 됐어요', nothelped: '별로였어요' };
+  var SV_NOT_READ = '<p class="ad-muted">설문을 못 읽었어요 — Firestore 규칙에 surveys 가 없어요. 저장소 firestore.rules 를 콘솔에 다시 게시하면 응답이 모여요 (게시 전에는 앱에서 답해도 저장되지 않아요).</p>';
+  function isCheck(a) { return a === 'helped' || a === 'nothelped'; }
   function surveysOf(uid) {
     return (state.surveys || []).filter(function (x) { return x.uid === uid; })
       .sort(function (a, b) { return a.week < b.week ? 1 : -1; });              // 최근 주부터
   }
   function fixName(k) { return k ? ((typeof Adapt !== 'undefined' && Adapt.NAME[k]) || k) : '—'; }
-  /* 명단 한 칸 — 가장 최근 답과 그때 켠 조치 */
-  /* ---------- 사람별 패턴 (분석용 · 앱은 바뀌지 않는다) ---------- */
+  function reasonOfFix(k) {
+    if (typeof Adapt === 'undefined') return null;
+    for (var r in Adapt.LADDER) if (Adapt.LADDER[r].indexOf(k) >= 0) return r;
+    return null;
+  }
+
+  /* ---------- 칸 ① 지난주 돌아보기 — 이유 · 조치 · 확인 ---------- */
+  function svBrief(uid) {
+    var l = surveysOf(uid);
+    if (!l.length) return '—';
+    return esc(SV_NAME[l[0].answer] || l[0].answer) + (l[0].fix ? ' → ' + esc(fixName(l[0].fix)) : '');
+  }
+  function svHtml(uid) {
+    if (state.surveys === null) return SV_NOT_READ;
+    var l = surveysOf(uid), mine = sessionsOf(uid);
+    var rate = function (wk) {
+      var r = typeof Report !== 'undefined' ? Report.mine(mine, { week: wk, start: wk, end: Report.addDays(wk, 6) }) : null;
+      return r ? r.goalRate + '%' : '—';
+    };
+    return '<p class="ad-muted">못 쬔 이유 → 켠 조치 → 다음 주 "도움이 됐나요?" → 유지 또는 다음 단계 (CALCULATION.md 11장). 목표 채운 비율은 앱 팝업과 같은 기준(하루 목표를 다 채운 날)이에요.</p>' +
+      (l.length ? table(['주 (월요일)', '답', '켠 · 확인한 조치', '단계', '그 주 목표 채운 비율', '다음 주'],
+        l.map(function (x) {
+          return [x.week, (isCheck(x.answer) ? '확인: ' : '이유: ') + esc(SV_NAME[x.answer] || x.answer), esc(fixName(x.fix)),
+                  x.fix ? (x.step || 0) + 1 + '단계' : '—', rate(x.week), rate(Report.addDays(x.week, 7))];
+        })) : '<p class="ad-muted">아직 응답이 없어요 — 타이머가 끝난 뒤 한 주에 한 번 팝업으로 받아요.</p>');
+  }
+
+  /* ---------- 칸 ② 요일 · 시간대 패턴 ---------- */
   var WD = ['월', '화', '수', '목', '금', '토', '일'];
+  var SLOT = [['아침', 0, 11], ['점심', 11, 14], ['오후', 14, 17], ['저녁', 17, 24]];
   function wdOf(key) { return ((S.dayNum(key) % 7) + 10) % 7; }        // 1970-01-01 = 목요일 → 월 0 … 일 6
-  function personPatternHtml(uid) {
+  function patternOf(uid) {
     var list = sessionsOf(uid);
-    if (!list.length) return '';
-    /* ① 요일 — 첫 기록 ~ 마지막 기록 사이에서 요일마다 쓴 날 / 그 요일 수 */
+    if (!list.length) return null;
+    /* 요일 — 첫 기록 ~ 마지막 기록 사이에서 요일마다 쓴 날 / 그 요일 수 */
     var days = {}, first = Infinity, last = -Infinity;
     list.forEach(function (x) { var d = S.dayNum(x.dateKey); days[d] = 1; if (d < first) first = d; if (d > last) last = d; });
     var tot = [0, 0, 0, 0, 0, 0, 0], used = [0, 0, 0, 0, 0, 0, 0];
@@ -375,65 +412,98 @@ var AdminView = (function () {
     var rates = WD.map(function (n, i) { return tot[i] ? used[i] / tot[i] : null; });
     var valid = rates.map(function (r, i) { return [r, i]; }).filter(function (x) { return x[0] !== null && tot[x[1]] >= 2; });
     var low = valid.length > 2 ? valid.slice().sort(function (a, b) { return a[0] - b[0]; })[0] : null;
-    var wdRow = table(WD, [rates.map(function (r, i) {
-      return r === null ? '—' : (low && low[1] === i ? '<b>' + Math.round(r * 100) + '%</b>' : Math.round(r * 100) + '%') +
-        '<br><span class="ad-muted">' + used[i] + ' / ' + tot[i] + '일</span>';
-    })]);
-    /* ② 시간대 — 타이머를 켠 시각 */
-    var SLOT = [['아침', 0, 11], ['점심', 11, 14], ['오후', 14, 17], ['저녁', 17, 24]], cnt = [0, 0, 0, 0];
+    /* 시간대 — 타이머를 켠 시각 */
+    var cnt = [0, 0, 0, 0];
     list.forEach(function (x) { var h = new Date(x.at).getHours(); SLOT.forEach(function (sl, i) { if (h >= sl[1] && h < sl[2]) cnt[i]++; }); });
-    var top = cnt.indexOf(Math.max.apply(null, cnt));
+    return { n: list.length, first: first, last: last, tot: tot, used: used, rates: rates, low: low,
+             cnt: cnt, top: cnt.indexOf(Math.max.apply(null, cnt)) };
+  }
+  function lowBrief(uid) { var p = patternOf(uid); return p && p.low ? WD[p.low[1]] + ' (' + Math.round(p.low[0] * 100) + '%)' : '—'; }
+  function slotBrief(uid) { var p = patternOf(uid); return p ? SLOT[p.top][0] : '—'; }
+  function patternHtml(uid) {
+    var p = patternOf(uid);
+    if (!p) return '<p class="ad-muted">타이머 기록이 없어요.</p>';
+    var wdRow = table(WD, [p.rates.map(function (r, i) {
+      return r === null ? '—' : (p.low && p.low[1] === i ? '<b>' + Math.round(r * 100) + '%</b>' : Math.round(r * 100) + '%') +
+        '<br><span class="ad-muted">' + p.used[i] + ' / ' + p.tot[i] + '일</span>';
+    })]);
     var slotRow = table(SLOT.map(function (sl) { return sl[0] + ' <span class="ad-muted">' + sl[1] + '~' + sl[2] + '시</span>'; }),
-      [cnt.map(function (c, i) { var t = c + '번 (' + Math.round(c / list.length * 100) + '%)'; return i === top ? '<b>' + t + '</b>' : t; })]);
-    /* ③ 같은 이유를 고른 다른 사람들에게 도움 됐던 조치 */
-    var mine = surveysOf(uid).filter(function (x) { return SV_NAME[x.answer] && x.answer !== 'helped' && x.answer !== 'nothelped' && x.answer !== 'none'; })[0];
-    var peer = '';
-    if (mine && state.surveys) {
-      var by = {};
-      state.surveys.forEach(function (x) {
-        if (x.uid === uid || (x.answer !== 'helped' && x.answer !== 'nothelped') || !x.fix) return;
-        var r = typeof Adapt !== 'undefined' ? Object.keys(Adapt.LADDER).filter(function (k) { return Adapt.LADDER[k].indexOf(x.fix) >= 0; }) : [];
-        if (r.indexOf(mine.answer) < 0) return;
-        by[x.fix] = by[x.fix] || [0, 0]; by[x.fix][1]++; if (x.answer === 'helped') by[x.fix][0]++;
-      });
-      var ks = Object.keys(by).sort(function (a, b) { return by[b][0] / by[b][1] - by[a][0] / by[a][1]; });
-      peer = ks.length ? table(['조치', '도움 됐어요', ''], ks.map(function (k) {
-          return [esc(fixName(k)), by[k][0] + ' / ' + by[k][1] + '번 (' + Math.round(by[k][0] / by[k][1] * 100) + '%)', mine.fix === k ? '<span class="ad-chip">지금 이 사람</span>' : ''];
-        })) : '<p class="ad-muted">같은 이유를 고른 다른 사람의 확인 답이 아직 없어요.</p>';
-      peer = '<h4 class="ad-sub-h">\'' + esc(SV_NAME[mine.answer]) + '\'를 고른 다른 사람들에게 도움 됐던 조치</h4>' + peer;
-    }
-    var note = [];
-    if (low) note.push('가장 자주 빠지는 요일: <b>' + WD[low[1]] + '요일</b> (' + Math.round(low[0] * 100) + '%)');
-    if (list.length) note.push('주로 쬐는 시간대: <b>' + SLOT[top][0] + '</b>');
-    return card('사람별 패턴 (분석용)',
-      '<p class="ad-muted">' + (note.join(' · ') || '기록이 더 쌓이면 보여요') + ' · 날씨는 타이머 기록에 저장되지 않아 패턴으로 보지 않아요</p>' +
-      '<h4 class="ad-sub-h">요일별 — 쓴 날 비율 (' + S.keyOf(first) + ' ~ ' + S.keyOf(last) + ')</h4>' + wdRow +
-      '<h4 class="ad-sub-h">시간대별 — 타이머를 켠 시각</h4>' + slotRow + peer);
+      [p.cnt.map(function (c, i) { var t = c + '번 (' + Math.round(c / p.n * 100) + '%)'; return i === p.top ? '<b>' + t + '</b>' : t; })]);
+    return '<p class="ad-muted">날씨는 타이머 기록에 저장되지 않아 패턴으로 보지 않아요.</p>' +
+      '<h4 class="ad-sub-h">요일별 — 쓴 날 비율 (' + S.keyOf(p.first) + ' ~ ' + S.keyOf(p.last) + ')</h4>' + wdRow +
+      '<h4 class="ad-sub-h">시간대별 — 타이머를 켠 시각</h4>' + slotRow;
   }
 
-  function surveyBrief(uid) {
-    var l = surveysOf(uid);
-    if (!l.length) return '—';
-    return esc(SV_NAME[l[0].answer] || l[0].answer) + (l[0].fix ? ' → ' + esc(fixName(l[0].fix)) : '');
+  /* ---------- 칸 ③ 같은 이유를 고른 다른 사람들 ---------- */
+  function peerHtml(uid) {
+    if (state.surveys === null) return SV_NOT_READ;
+    var mine = surveysOf(uid).filter(function (x) { return SV_NAME[x.answer] && !isCheck(x.answer) && x.answer !== 'none'; })[0];
+    if (!mine) return '<p class="ad-muted">이 사람이 고른 이유가 아직 없어요.</p>';
+    var by = {};
+    state.surveys.forEach(function (x) {
+      if (x.uid === uid || !isCheck(x.answer) || !x.fix || reasonOfFix(x.fix) !== mine.answer) return;
+      by[x.fix] = by[x.fix] || [0, 0]; by[x.fix][1]++; if (x.answer === 'helped') by[x.fix][0]++;
+    });
+    var ks = Object.keys(by).sort(function (a, b) { return by[b][0] / by[b][1] - by[a][0] / by[a][1]; });
+    return '<p class="ad-muted">\'' + esc(SV_NAME[mine.answer]) + '\'를 고른 다른 사람들이 확인 질문에 답한 결과예요.</p>' +
+      (ks.length ? table(['조치', '도움 됐어요', ''], ks.map(function (k) {
+        return [esc(fixName(k)), by[k][0] + ' / ' + by[k][1] + '번 (' + Math.round(by[k][0] / by[k][1] * 100) + '%)',
+                mine.fix === k ? '<span class="ad-chip">지금 이 사람</span>' : ''];
+      })) : '<p class="ad-muted">같은 이유를 고른 다른 사람의 확인 답이 아직 없어요.</p>');
   }
-  function personSurveyHtml(uid) {
-    var body;
-    if (state.surveys === null) {
-      body = '<p class="ad-muted">설문을 못 읽었어요 — Firestore 규칙에 surveys 가 없어요. 저장소 firestore.rules 를 콘솔에 다시 게시하면 응답이 모여요 (게시 전에는 앱에서 답해도 저장되지 않아요).</p>';
-    } else {
-      var l = surveysOf(uid), mine = sessionsOf(uid);
-      var rate = function (wk) {
-        var r = typeof Report !== 'undefined' ? Report.mine(mine, { week: wk, start: wk, end: Report.addDays(wk, 6) }) : null;
-        return r ? r.goalRate + '%' : '—';
+
+  /* 개인화 칸 목록 — 새 개인화는 여기에 하나 더 넣는다 */
+  var PERSONAL = [
+    { title: '지난주 돌아보기 — 이유 · 조치 · 확인', col: '최근 답 → 조치', brief: svBrief, html: svHtml },
+    { title: '요일 · 시간대 패턴', col: '자주 빠지는 요일', brief: lowBrief, html: patternHtml },
+    { title: '', col: '주로 쬐는 시간대', brief: slotBrief, html: null },
+    { title: '같은 이유를 고른 다른 사람들에게 도움 됐던 조치', html: peerHtml }
+  ];
+
+  /* 전체 — 이유 → 조치별 '도움 됐어요' */
+  function effectsHtml() {
+    if (state.surveys === null) return card('조치별 효과 (전체)', SV_NOT_READ);
+    var by = {}, reasons = {};
+    (state.surveys || []).forEach(function (x) {
+      if (!isCheck(x.answer) || !x.fix) return;
+      var k = (reasonOfFix(x.fix) || '?') + '|' + x.fix;
+      by[k] = by[k] || [0, 0]; by[k][1]++; if (x.answer === 'helped') by[k][0]++;
+    });
+    (state.surveys || []).forEach(function (x) { if (SV_NAME[x.answer] && !isCheck(x.answer)) reasons[x.answer] = (reasons[x.answer] || 0) + 1; });
+    var ks = Object.keys(by).sort();
+    var rs = Object.keys(reasons).sort(function (a, b) { return reasons[b] - reasons[a]; });
+    return card('조치별 효과 (전체)',
+      '<p class="ad-muted">못 쬔 이유 응답 ' + rs.reduce(function (n, k) { return n + reasons[k]; }, 0) + '번' +
+        (rs.length ? ' · ' + rs.map(function (k) { return esc(SV_NAME[k]) + ' ' + reasons[k]; }).join(' · ') : '') + '</p>' +
+      (ks.length ? table(['이유', '조치', '단계', '도움 됐어요'], ks.map(function (k) {
+        var p = k.split('|'), lad = typeof Adapt !== 'undefined' && Adapt.LADDER[p[0]];
+        return [esc(SV_NAME[p[0]] || p[0]), esc(fixName(p[1])), lad ? lad.indexOf(p[1]) + 1 + '단계' : '—',
+                by[k][0] + ' / ' + by[k][1] + '번 (' + Math.round(by[k][0] / by[k][1] * 100) + '%)'];
+      })) : '<p class="ad-muted">아직 확인 질문 답이 없어요 — 조치를 켠 다음 주에 "도움이 됐나요?"로 받아요.</p>'));
+  }
+
+  function personalHtml() {
+    var list = roster();
+    var cols = PERSONAL.filter(function (m) { return m.brief; });
+    var sel = state.psel;
+    return '<div class="ad-hd"><h2>개인화</h2><p class="ad-muted">사람마다 어떤 이유로 못 쬐고, 앱이 무엇을 바꿨고, 효과가 있었는지 봐요. 분석용이라 여기서는 아무것도 바뀌지 않아요.</p></div>' +
+      effectsHtml() +
+      card('사람', list.length ? table(['ID', '타이머 기록'].concat(cols.map(function (m) { return m.col; })).concat(['']),
+        list.map(function (p) {
+          return ['<code>' + esc(shortId(p.uid)) + '</code>', p.n + '번'].concat(cols.map(function (m) { return m.brief(p.uid); }))
+            .concat(['<button class="ad-link" data-psel="' + esc(p.uid) + '">' + (sel === p.uid ? '보는 중' : '보기') + '</button>']);
+        })) : empty()) +
+      (sel ? '<div id="ps-person">' + PERSONAL.filter(function (m) { return m.html; }).map(function (m) {
+        return card('<code>' + esc(shortId(sel)) + '</code> · ' + m.title, m.html(sel));
+      }).join('') + '</div>' : '');
+  }
+  function bindPersonal() {
+    [].forEach.call(document.querySelectorAll('[data-psel]'), function (b) {
+      b.onclick = function () {
+        state.psel = b.dataset.psel; render();
+        var el = document.getElementById('ps-person'); if (el) el.scrollIntoView({ block: 'start' });
       };
-      body = l.length ? table(['주 (월요일)', '답', '켠 · 확인한 조치', '단계', '그 주 목표 채운 비율', '다음 주'],
-        l.map(function (x) {
-          var q = x.answer === 'helped' || x.answer === 'nothelped' ? '확인: ' : '이유: ';
-          return [x.week, q + esc(SV_NAME[x.answer] || x.answer), esc(fixName(x.fix)), x.fix ? (x.step || 0) + 1 + '단계' : '—',
-                  rate(x.week), rate(Report.addDays(x.week, 7))];
-        })) : '<p class="ad-muted">아직 응답이 없어요 — 타이머가 끝난 뒤 한 주에 한 번 팝업으로 받아요.</p>';
-    }
-    return card('지난주 돌아보기 (개인화)', '<p class="ad-muted">못 쬔 이유 → 켠 조치 → 다음 주 "도움이 됐나요?" → 유지 또는 다음 단계 (CALCULATION.md 11장). 목표 채운 비율은 하루 목표를 다 채운 날의 비율이에요.</p>' + body);
+    });
   }
 
   function summaryHtml(x) {
@@ -647,14 +717,14 @@ var AdminView = (function () {
   function manageHtml() {
     var list = roster();
     var demoNote = state.mode === 'demo' ? '<div class="ad-note">예시 데이터예요. 여기서 바꾼 내용은 이 화면에서만 보이고 저장되지 않아요.</div>' : '';
-    return '<div class="ad-hd"><h2>기록 관리</h2><p class="ad-muted">기록을 넣고 · 고치고 · 지울 수 있어요. 「기록 보기」를 누르면 그 사람의 개인화 · 패턴 · 기록이 아래에 나와요. 바꾼 내용은 이유와 함께 Firestore adminLog 에 남아요.</p></div>' +
+    return '<div class="ad-hd"><h2>기록 관리</h2><p class="ad-muted">기록을 넣고 · 고치고 · 지울 수 있어요. 사람별 개인화는 「개인화」 탭에서 봐요. 바꾼 내용은 이유와 함께 Firestore adminLog 에 남아요.</p></div>' +
       demoNote +
       card('참가자', '<div class="ad-bar-r"><span class="ad-muted">로그인이 안 되는 사람은 참가자를 새로 만들어 기록을 대신 넣을 수 있어요.</span>' +
           '<button class="ad-btn sm sub" id="mg-add-user">참가자 추가</button></div>' +
-        (list.length ? table(['ID', '타이머 기록', '쬔 시간 합계(분)', '마지막 기록', '개인화 (최근 답 → 조치)', ''],
+        (list.length ? table(['ID', '타이머 기록', '쬔 시간 합계(분)', '마지막 기록', ''],
           list.map(function (p) {
             return ['<code>' + esc(shortId(p.uid)) + '</code>' + (p.manual ? ' <span class="ad-chip">직접 추가</span>' : ''),
-              p.n + '번', fmt(p.min, 0), p.last || '—', surveyBrief(p.uid),
+              p.n + '번', fmt(p.min, 0), p.last || '—',
               '<div class="ad-acts">' +
                 '<button class="ad-link" data-sel="' + esc(p.uid) + '">' + (state.sel === p.uid ? '보는 중' : '기록 보기') + '</button>' +
                 '<button class="ad-link" data-merge="' + esc(p.uid) + '">합치기</button>' +
@@ -662,8 +732,7 @@ var AdminView = (function () {
               '</div>'];
           })) : empty())) +
       (state.merge ? mergeHtml(list) : '') +
-      /* 사람을 고르면 개인화 · 패턴을 먼저(위에) 보여 주고, 긴 타이머 기록 목록은 그 아래에 둔다 */
-      (state.sel ? personSurveyHtml(state.sel) + personPatternHtml(state.sel) + personHtml(state.sel) : '');
+      (state.sel ? personHtml(state.sel) : '');
   }
 
   function mergeHtml(list) {
@@ -933,7 +1002,7 @@ var AdminView = (function () {
     $('ad-out').onclick = function () {
       var done = function () {
         state.mode = null; state.users = []; state.sessions = []; state.error = null;
-        state.log = []; state.sel = state.edit = state.merge = null;
+        state.log = []; state.sel = state.edit = state.merge = state.psel = null;
         state.offline = null; state.offlineErr = false;
         render();
       };
@@ -944,6 +1013,7 @@ var AdminView = (function () {
     if ($('ad-reload')) $('ad-reload').onclick = fetchLive;
     if ($('ad-csv')) $('ad-csv').onclick = exportCsv;
     if (state.tab === 'manage') bindManage();
+    if (state.tab === 'personal') bindPersonal();
     if ($('of-file')) $('of-file').onchange = function () { var f = this.files && this.files[0]; this.value = ''; if (f) importOffline(f); };
     if ($('of-clear')) $('of-clear').onclick = clearOffline;
 
@@ -993,7 +1063,7 @@ var AdminView = (function () {
 
   function start() {
     var h = (location.hash || '').slice(1);
-    if (['summary', 'records', 'manage', 'settings'].indexOf(h) >= 0) state.tab = h;
+    if (['summary', 'records', 'personal', 'manage', 'settings'].indexOf(h) >= 0) state.tab = h;
     if (initFirebase()) {
       /* 이미 관리자로 로그인해 있으면 바로 불러온다 */
       var first = true;
