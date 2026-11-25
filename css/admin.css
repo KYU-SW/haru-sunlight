@@ -145,5 +145,25 @@ code { font-family:ui-monospace, Menlo, monospace; font-size:.9em; }
 }
 @media (prefers-reduced-motion: reduce) { .ad-toast { transition:none; } }
 
-/* 기록 관리 › 사람별 패턴 — 표 위 작은 제목 */
-.ad-sub-h { margin:18px 0 6px; font-size:13px; font-weight:700; color:#131A2B; }
+
+/* 개인화 — 조치별 효과 마인드맵 (못 쬔 이유 → 1단계 → 2단계) */
+.mm-n { display:flex; flex-direction:column; gap:2px; padding:9px 12px; border-radius:12px; border:1.5px solid #E3ECFF; background:#FFF; min-width:96px; }
+.mm-t { font-size:13px; font-weight:700; color:#131A2B; white-space:nowrap; }
+.mm-s { font-size:11px; color:#5B6478; white-space:nowrap; }
+.mm-n.why { background:#E3ECFF; border-color:#E3ECFF; }
+.mm-n.why.dim { background:#F3F6FB; border-color:#F3F6FB; }
+.mm-n.why.dim .mm-t { color:#8E96A8; }
+.mm-n.fix { border-color:#326CF9; }
+.mm-n.fix.good { background:#EAF0FF; }
+.mm-n.root { background:#131A2B; border-color:#131A2B; }
+.mm-n.root .mm-t, .mm-n.root .mm-s { color:#FFF; }
+.mm-a { width:22px; height:2px; background:#8E96A8; position:relative; flex:none; }
+.mm-a::after { content:''; position:absolute; right:-1px; top:-4px; border:5px solid transparent; border-left-color:#8E96A8; border-right:0; }
+.mm-map { display:flex; align-items:center; gap:0; overflow-x:auto; padding:6px 0; }
+.mm-root { flex:none; padding-right:22px; position:relative; }
+.mm-root::after { content:''; position:absolute; right:0; top:50%; width:22px; height:2px; background:#8E96A8; }
+.mm-branches { display:flex; flex-direction:column; gap:10px; border-left:2px solid #8E96A8; padding-left:0; }
+.mm-row { display:flex; align-items:center; }
+.mm-row::before { content:''; width:18px; height:2px; background:#8E96A8; flex:none; }
+.mm-more { margin-top:12px; }
+.mm-more summary { cursor:pointer; font-size:13px; font-weight:600; color:#326CF9; }
