@@ -413,9 +413,9 @@ var AdminView = (function () {
     tiles.push(
       { lab: retLabel(rec.weeks), val: rec.retained === null ? '—' : '<b>' + rec.retained + '</b> / ' + rec.n + '명',
         sub: (rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요') + appOnly },
-      { lab: '하루 목표를 다 채운 날', val: '한 사람당 <b>' + fmt(S.mean(m.goals)) + '</b>일', sub: '비타민D 하루 목표를 100% 채운 날' },
+      { lab: '목표 달성일', val: '한 사람당 <b>' + fmt(S.mean(m.goals)) + '</b>일', sub: '하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날 (목표 달성일)' },
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
-      { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표를 100% 채운 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
+      { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
     );
     var sv = surveyTile();
     if (sv) tiles.push(sv);
@@ -444,7 +444,7 @@ var AdminView = (function () {
       ['등록한 사람', m.n + '명'],
       ['타이머를 쓴 사람', m.withData + '명'],
       [c.stampMin + '분 이상 쬔 날 (한 사람당)', fmt(S.mean(rec.stamps)) + '일'],
-      ['하루 목표를 다 채운 날 (한 사람당)', fmt(S.mean(m.goals)) + '일'],
+      ['목표 달성일 (한 사람당 · 하루 목표 70% 이상)', fmt(S.mean(m.goals)) + '일'],
       ['하루 목표를 채운 비율 (쓴 날 중)', pct(m.goalRate)],
       [off ? '하루에 채운 양 (평균 · 앱 기록)' : '하루에 채운 양 (평균)', fmt(rec.avgCharge, 0) + '%']
     ];
@@ -474,7 +474,7 @@ var AdminView = (function () {
           })), '타이머를 안 쓴 사람은 0분으로 계산해요' + (off ? ' · 앱 기록이 있는 ' + rec.n + '명 기준' : '')) +
         card('숫자로 보기', rows(numbers)) +
         card(c.stampMin + '분 이상 쬔 날이 며칠인 사람이 몇 명?', groups(rec.stamps), '예: 8~14일 줄의 숫자 = 그만큼 쬔 사람 수') +
-        card('하루 목표를 다 채운 날이 며칠인 사람이 몇 명?', groups(m.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
+        card('목표 달성일이 며칠인 사람이 몇 명?', groups(m.goals), '예: 0일 줄의 숫자 = 한 번도 못 채운 사람 수') +
         (off ?
           card('사용 전 지연 시간별 사람 수', hbarList(off.beforeBins, off.n), '한 사람의 평균 지연 기준') +
           card('사용 후 지연 시간별 사람 수', hbarList(off.afterBins, off.n), '한 사람의 평균 지연 기준') +

@@ -5,9 +5,12 @@
    원칙
      · 집단 수준으로만 본다.
      · 주차별 평균의 분모는 Firestore에 들어온 참가자 전원. 기록이 없는 사람도 0분으로 넣는다.
-     · 스탬프 = 그날 타이머 분 합계가 기준(분) 이상인 날. 목표 달성일 = 그날 충전률 합 100% 이상.
+     · 스탬프 = 그날 타이머 분 합계가 기준(분) 이상인 날. 목표 달성일 = 그날 충전률 합이 하루 목표의 70%(GOAL_PCT) 이상.
    ========================================================= */
 var AdminStats = (function () {
+
+  /* 목표 달성일 기준 — 하루 목표(비타민D 100%)의 70% 이상 쬔 날 (평가 계획 ① 목표를 채운 날이 있었나) */
+  var GOAL_PCT = 70;
 
   /* ---------- 날짜 ---------- */
   function dayNum(key) {                 // 'YYYY-MM-DD' → 1970-01-01부터의 일수 (시간대 영향 없음)
@@ -89,7 +92,7 @@ var AdminStats = (function () {
         var x = days[d];
         week[Math.floor((d - start) / 7)] += x.min;
         if (x.min >= stampMin) stamps++;
-        if (x.pct >= 100) goals++;
+        if (x.pct >= GOAL_PCT) goals++;
         pcts.push(x.pct);
       });
       /* 최장 공백일 — 평가 기간 안에서 기록 없이 이어진 날 수 */
@@ -188,6 +191,6 @@ var AdminStats = (function () {
   }
 
   return {
-    dayNum: dayNum, keyOf: keyOf, mean: mean, sd: sd, median: median, ci95: ci95, records: records
+    GOAL_PCT: GOAL_PCT, dayNum: dayNum, keyOf: keyOf, mean: mean, sd: sd, median: median, ci95: ci95, records: records
   };
 })();
