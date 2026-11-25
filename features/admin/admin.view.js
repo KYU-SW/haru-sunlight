@@ -425,6 +425,11 @@ var AdminView = (function () {
     if (sv) tiles.push(sv);
     var ck = checkTile();
     if (ck) tiles.push(ck);
+    /* 설문을 못 읽었거나 아직 응답이 없으면 칸을 숨기지 않고 이유를 보여 준다 */
+    if (!sv && !ck && state.mode === 'live') tiles.push(state.surveys === null
+      ? { lab: '지난주 돌아보기 설문 (개인화)', val: '<b>못 읽었어요</b>',
+          sub: 'Firestore 규칙에 surveys 가 없어요 — 저장소 firestore.rules 를 콘솔에 다시 게시하면 응답이 모이고 여기 보여요 (게시 전에는 앱에서 답해도 저장되지 않아요)' }
+      : { lab: '지난주 돌아보기 설문 (개인화)', val: '<b>0</b>번', sub: '아직 응답이 없어요 — 타이머가 끝난 뒤 한 주에 한 번 팝업으로 받아요' });
     return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-tiles">' + tiles.map(function (t) {
         return '<div class="ad-tile"><span class="ad-lab">' + t.lab + '</span><div class="ad-big">' + t.val + '</div>' +
