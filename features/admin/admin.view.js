@@ -35,7 +35,7 @@ var AdminView = (function () {
   function load(k, fb) { try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch (e) { return fb; } }
   function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
 
-  var DEFAULT_CFG = { start: '', weeks: 0, stampMin: 5, growth: 20 };
+  var DEFAULT_CFG = { start: '', weeks: 0, stampMin: 5, growth: 20, goalPeople: 70 };
   function cfg() {
     var c = load(KEY_CFG, {}), o = {};
     for (var k in DEFAULT_CFG) o[k] = c[k] !== undefined ? c[k] : DEFAULT_CFG[k];
@@ -415,7 +415,9 @@ var AdminView = (function () {
         sub: (rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요') + appOnly },
       /* 평가 계획 ① '목표를 채운 날이 있었나' — 목표 달성일(하루 목표의 70% 이상 쬔 날)이 하루라도 있으면 그 사람은 달성 */
       { lab: '목표를 채운 날이 있었던 사람', val: '<b>' + m.goals.filter(function (g) { return g > 0; }).length + '</b> / ' + m.goals.length + '명',
-        sub: '목표 달성일 = 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날 · 하루라도 있으면 달성 · 한 사람당 평균 ' + fmt(S.mean(m.goals)) + '일' },
+        sub: '목표 달성일 = 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날 · 하루라도 있으면 달성 · 한 사람당 평균 ' + fmt(S.mean(m.goals)) + '일',
+        ok: m.goals.length ? m.goals.filter(function (g) { return g > 0; }).length / m.goals.length * 100 >= c.goalPeople : null,
+        goal: '목표: 참가자의 ' + c.goalPeople + '% 이상' },
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
       { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
     );
@@ -885,6 +887,7 @@ var AdminView = (function () {
         f('cf-weeks', '평가 기간 (주)', c.weeks || '', 'number', '비우면 마지막 기록까지') +
         f('cf-stamp', '쬔 날로 셀 최소 시간 (분)', c.stampMin, 'number', '하루에 이만큼 쬐면 쬔 날(스탬프 1개)로 세요') +
         f('cf-growth', '햇빛 시간 늘리기 목표 (%)', c.growth, 'number', '첫 주보다 마지막 주에 몇 % 늘면 목표 달성인지') +
+        f('cf-goalpeople', '목표를 채운 날이 있었던 사람 목표 (%)', c.goalPeople, 'number', '참가자 중 몇 %가 목표 달성일(하루 목표의 70% 이상)을 하루라도 가지면 목표 달성인지') +
         '<div class="ad-form-f"><button class="ad-btn" id="cf-save">저장</button><button class="ad-link" id="cf-reset">처음 값으로</button></div>' +
       '</section>' +
       offlineCardHtml() +
@@ -920,7 +923,8 @@ var AdminView = (function () {
         var v = function (id) { return $(id).value.trim(); };
         save(KEY_CFG, {
           start: v('cf-start'), weeks: Math.max(0, +v('cf-weeks') || 0),
-          stampMin: Math.max(0, +v('cf-stamp') || 0), growth: +v('cf-growth') || 0
+          stampMin: Math.max(0, +v('cf-stamp') || 0), growth: +v('cf-growth') || 0,
+          goalPeople: Math.min(100, Math.max(0, +v('cf-goalpeople') || 0))
         });
         render();
         toast('저장했어요');
