@@ -48,7 +48,9 @@ function one(city) {
     var maxUv = hourly.reduce(function (m, h) { return Math.max(m, h.uvi || 0); }, 0);
     var temps = hourly.map(function (h) { return h.tempC; }).filter(function (v) { return typeof v === 'number'; });
     var rx = Prescription.forToday(w, city, PROFILE);
-    var okData = day.date && hourly.length >= 6 && temps.length >= 6;
+    /* 오늘 남은 시간만 오므로 밤에는 몇 칸뿐이다 — 오늘은 앱 계산에 필요한 2칸 이상, 내일은 하루치(6칸 이상)가 있어야 한다 */
+    var next = w.days[1] ? (w.days[1].hourly || []) : [];
+    var okData = day.date && hourly.length >= 2 && temps.length >= 2 && next.length >= 6;
     var okRx = rx && rx.mode && rx.mode.id;
     rows.push('<tr><td><b>' + city.name + '</b></td>' +
       '<td>' + mark(okData) + ' ' + esc(day.date) + ' · 시간별 ' + hourly.length + '칸<br>최고 기온 ' + Math.max.apply(null, temps) + '℃ · 최고 자외선지수 ' + maxUv.toFixed(1) + '</td>' +
