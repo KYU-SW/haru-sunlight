@@ -413,7 +413,11 @@ var AdminView = (function () {
     tiles.push(
       { lab: retLabel(rec.weeks), val: rec.retained === null ? '—' : '<b>' + rec.retained + '</b> / ' + rec.n + '명',
         sub: (rec.weeks > 1 ? '첫 주에 쓰고 ' + (rec.weeks === 2 ? '둘째' : '마지막') + ' 주에도 타이머를 켠 사람' : '평가 기간이 2주 이상이어야 셀 수 있어요') + appOnly },
-      { lab: '목표 달성일', val: '한 사람당 <b>' + fmt(S.mean(m.goals)) + '</b>일', sub: '하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날 (목표 달성일)' },
+      /* 평가 계획 ① '목표를 채운 날이 있었나' — 한 사람당 평균 1일 이상이면 달성 */
+      { lab: '목표 달성일', val: '한 사람당 <b>' + fmt(S.mean(m.goals)) + '</b>일',
+        sub: '하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날 · 달성일이 있었던 사람 ' +
+             m.goals.filter(function (g) { return g > 0; }).length + ' / ' + m.goals.length + '명',
+        ok: m.goals.length ? S.mean(m.goals) >= 1 : null, goal: '목표: 한 사람당 1일 이상' },
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
       { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
     );
