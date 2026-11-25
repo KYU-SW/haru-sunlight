@@ -647,7 +647,7 @@ var AdminView = (function () {
   function manageHtml() {
     var list = roster();
     var demoNote = state.mode === 'demo' ? '<div class="ad-note">예시 데이터예요. 여기서 바꾼 내용은 이 화면에서만 보이고 저장되지 않아요.</div>' : '';
-    return '<div class="ad-hd"><h2>기록 관리</h2><p class="ad-muted">기록을 넣고 · 고치고 · 지울 수 있어요. 바꾼 내용은 이유와 함께 아래 변경 내역에 남아요.</p></div>' +
+    return '<div class="ad-hd"><h2>기록 관리</h2><p class="ad-muted">기록을 넣고 · 고치고 · 지울 수 있어요. 「기록 보기」를 누르면 그 사람의 개인화 · 패턴 · 기록이 아래에 나와요. 바꾼 내용은 이유와 함께 Firestore adminLog 에 남아요.</p></div>' +
       demoNote +
       card('참가자', '<div class="ad-bar-r"><span class="ad-muted">로그인이 안 되는 사람은 참가자를 새로 만들어 기록을 대신 넣을 수 있어요.</span>' +
           '<button class="ad-btn sm sub" id="mg-add-user">참가자 추가</button></div>' +
@@ -662,8 +662,8 @@ var AdminView = (function () {
               '</div>'];
           })) : empty())) +
       (state.merge ? mergeHtml(list) : '') +
-      (state.sel ? personHtml(state.sel) + personSurveyHtml(state.sel) + personPatternHtml(state.sel) : '') +
-      logHtml();
+      /* 사람을 고르면 개인화 · 패턴을 먼저(위에) 보여 주고, 긴 타이머 기록 목록은 그 아래에 둔다 */
+      (state.sel ? personSurveyHtml(state.sel) + personPatternHtml(state.sel) + personHtml(state.sel) : '');
   }
 
   function mergeHtml(list) {
@@ -721,14 +721,7 @@ var AdminView = (function () {
     '</div>';
   }
 
-  function logHtml() {
-    if (!state.log.length) return card('변경 내역', '<div class="ad-empty">아직 바꾼 기록이 없어요</div>');
-    return card('변경 내역', table(['언제', '무엇을', '대상', '이유'], state.log.slice(0, 50).map(function (e) {
-      var at = e.at && e.at.toDate ? e.at.toDate() : new Date(e.at);
-      var when = isNaN(at) ? '—' : (at.getMonth() + 1) + '/' + at.getDate() + ' ' + hhmm(at.getTime());
-      return [when, ACTIONS[e.action] || esc(e.action), '<code>' + esc(e.target || '') + '</code>', esc(e.reason || '')];
-    })), '최근 50건');
-  }
+
 
   /* ---------- 동작 ---------- */
   function bindManage() {
@@ -987,7 +980,7 @@ var AdminView = (function () {
   /* 기록 CSV — 발표 자료·통계 프로그램용. 이름·이메일은 원래 없다. */
   function exportCsv() {
     var head = ['uid', 'dateKey', 'at', 'minutes', 'percent', 'clothing', 'limitedBy', 'endedBy'];
-    /* 관리자가 넣거나 고친 기록은 표시해 둔다 (자세한 내용은 기록 관리 › 변경 내역) */
+    /* 관리자가 넣거나 고친 기록은 표시해 둔다 (바꾼 내용은 Firestore adminLog) */
     var lines = [head.concat(['manual', 'edited']).join(',')].concat(state.sessions.map(function (s) {
       return head.map(function (k) { return csvCell(s[k]); }).concat([s.manual ? 1 : 0, s.editedAt ? 1 : 0]).join(',');
     }));
