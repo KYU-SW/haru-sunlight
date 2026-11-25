@@ -242,6 +242,10 @@ ok('parseUv — 정오 근처 UV가 가장 높다',
 var noonMs = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 13, 0, 0).getTime();
 var interp = _.uvAt(parsedUv, noonMs);
 ok('uvAt — 3시간 표본 사이 선형보간', interp > 0 && interp < 10, '13시 보간값 ' + interp.toFixed(2));
+var rb23 = _.recentBases(new Date(2026, 10, 25, 23, 30), _.FCST_USE_HOURS, 2), rb00 = _.recentBases(new Date(2026, 10, 26, 0, 30), _.FCST_USE_HOURS, 2);
+ok('단기예보 — 밤 23시대 · 자정 넘어서도 20시 발표를 써서 그날 자료가 있다 (23시 발표는 다음 날 00시부터라 안 씀)',
+   rb23[0].getHours() === 20 && rb23[0].getDate() === 25 && rb00[0].getHours() === 20 && rb00[0].getDate() === 25 &&
+   _.FCST_USE_HOURS.indexOf(23) < 0);
 ok('uvAt — 발표 이전 시각은 0', _.uvAt(parsedUv, uvBase.getTime() - 3600000) === 0);
 
 var loc = { lat: 37.5665, lon: 126.9780, name: '서울' };

@@ -16,6 +16,10 @@ var KmaProvider = (function () {
 
   var TZ_HOURS = 9;                                       // 기상청 = KST 고정
   var FCST_BASE_HOURS = [2, 5, 8, 11, 14, 17, 20, 23];     // 단기예보 발표시각
+  /* 23시 발표는 다음 날 00시부터만 담겨 있어, 23시 15분 ~ 자정에 받으면 '오늘' 자료가 하나도 없다
+     (오늘 처방을 못 만들어 오류 화면이 뜬다). 그래서 23시 발표는 쓰지 않고 20시 발표를 쓴다 —
+     20시 발표는 21시부터 사흘 뒤까지라 자정 넘어서도 그날 하루를 다 담는다 */
+  var FCST_USE_HOURS = [2, 5, 8, 11, 14, 17, 20];
   var UV_BASE_HOURS = [6, 18];                             // 자외선지수 발표시각(1일 2회)
   var PUBLISH_DELAY_MIN = 15;                              // 발표 후 실제 제공까지의 여유
 
@@ -90,7 +94,7 @@ var KmaProvider = (function () {
      구름(SKY)은 따로 쓰지 않는다 — 기상청 자외선지수 예보에 구름 보정이 이미 들어 있어
      한 번 더 곱하면 두 번 깎인다. 강수는 '그 시간에 나갈 수 있나'를 가르는 데만 쓴다. */
   function fetchForecast(src, nx, ny, now) {
-    var bases = recentBases(now, FCST_BASE_HOURS, 2);
+    var bases = recentBases(now, FCST_USE_HOURS, 2);
 
     function attempt(i) {
       if (i >= bases.length) return Promise.reject(new Error('단기예보 발표 자료를 찾지 못했습니다'));
@@ -265,7 +269,7 @@ var KmaProvider = (function () {
 
   return {
     FCST_URL: FCST_URL, UV_URL: UV_URL, load: load,
-    _: { recentBases: recentBases, parseForecast: parseForecast, parseUv: parseUv,
+    _: { recentBases: recentBases, FCST_USE_HOURS: FCST_USE_HOURS, parseForecast: parseForecast, parseUv: parseUv,
          uvAt: uvAt, merge: merge, encKey: encKey, unwrap: unwrap, source: source }
   };
 })();
