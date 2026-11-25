@@ -126,7 +126,7 @@
   var NS = 'sunrx.';
   if (P.state !== 'fresh') {
     var prof = { onboarded: true, skinType: 3, clothing: 'shortShort', spf: 1, age: 22, heightCm: 168, weightKg: 60, notify: false };
-    if (P.state !== 'noconsent') prof.consent = { agreed: true, version: 'v2', at: RD.now() + OFF - 86400000 };
+    if (P.state !== 'noconsent') prof.consent = { agreed: true, version: 'v3', at: RD.now() + OFF - 86400000 };
     fakeStorage.setItem(NS + 'profile', JSON.stringify(prof));
     fakeStorage.setItem(NS + 'location', JSON.stringify({ lat: 37.5665, lon: 126.9780, name: '서울', precise: false }));
   }

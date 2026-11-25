@@ -9,7 +9,7 @@
 
 | 단계 | 페이지 | 무엇을 확인하나 | 외부 호출 | 최근 결과 |
 |---|---|---|---|---|
-| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 · 이유에 맞춘 조치(유지 · 다음 단계 · 끝) | 없음 | **143 PASS / 0 FAIL** |
+| 단위 | [`tests/smoke.html`](https://kyu-sw.github.io/haru-sunlight/tests/smoke.html) | 계산 엔진(비타민D · 화상 · 체감온도) · 태양고도 · 모드 판정 · 기상청 좌표 변환 · 응답 파싱 · 저장소 · 회복 코스 · 이유에 맞춘 조치(유지 · 다음 단계 · 끝) | 없음 | **144 PASS / 0 FAIL** |
 | 통합 | [`tests/integration.html`](https://kyu-sw.github.io/haru-sunlight/tests/integration.html) | 실제 앱 화면(index.html)을 띄워 **사용자 흐름 15가지**를 끝까지 — 기상청 → 처방 → 타이머 → 기록 → Firestore 업로드 → 회복 코스, 장애 상황 | 없음 (기상청 · Firebase 모의) | **74 PASS / 0 FAIL** |
 | 실제 연결 | [`tests/live.html`](https://kyu-sw.github.io/haru-sunlight/tests/live.html) · [Actions › Live KMA](https://github.com/KYU-SW/haru-sunlight/actions/workflows/live.yml) | 배포 사이트와 같은 경로로 **진짜 기상청 예보**(서울 · 부산 · 제주)를 받아 앱 계산까지 — **매일 09:00 · 배포 직후 자동 실행**, Summary에 지역별 표 | 기상청 (읽기만) | **6 PASS / 0 FAIL** |
 | Firebase 규칙 | [`tests/firestore/rules.test.mjs`](tests/firestore/rules.test.mjs) | **Firebase 에뮬레이터(실제 Firestore 규칙 엔진)**에 저장소의 `firestore.rules`를 그대로 올려 31가지 검사 — 본인 기록 쓰기 · 남의 uid 거절 · 이메일 · 좌표 · 나이 원값 거절 · 값 범위 · 올린 기록 수정 · 삭제 금지 · 관리자 권한(이메일 + UID) · adminLog 수정 금지 · offline 관리자 전용 · 설문(한 주 한 번 · 조치 이름 · 단계 범위) · 그 밖 경로 차단 · **지난주 평균 자동 계산**(scripts/weekly-stats) 4가지 — 지난주만 · 관리자 제외 · 평균 숫자만 씀 | 없음 (로컬 에뮬레이터 · `demo-` 프로젝트) | **35 PASS / 0 FAIL** |

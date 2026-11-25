@@ -284,7 +284,7 @@ var AdminView = (function () {
   function groupTable(list, weeks) {
     if (!list.length) return empty();
     var small = list.some(function (g) { return g.n < 5; });
-    return table(['구간', '사람', '타이머 쓴 사람', '일주일 평균(분)', '목표 다 채운 날', retLabel(weeks)],
+    return table(['구간', '사람', '타이머 쓴 사람', '일주일 평균(분)', '목표 달성일', retLabel(weeks)],
       list.map(function (g) {
         return [esc(g.label), g.n + '명', g.withData + '명', fmt(g.weekMean), fmt(g.goalsMean) + '일', g.retained + '명'];
       })) +
@@ -328,8 +328,8 @@ var AdminView = (function () {
       n: rec.n + op.length,
       withData: rec.withData + op.filter(function (p) { return p.records > 0; }).length,
       times: rec.sessions + (off ? off.records : 0),
-      goals: rec.goals.concat(op.map(function (p) { return p.goalDone; })),               // 사람별 목표 다 채운 날
-      goalRate: (appDays + offDays) ? (appGoals + offGoals) / (appDays + offDays) : NaN   // 쓴 날 중 목표를 다 채운 날
+      goals: rec.goals.concat(op.map(function (p) { return p.goalDone; })),               // 사람별 목표 달성일 (하루 목표의 70% 이상)
+      goalRate: (appDays + offDays) ? (appGoals + offGoals) / (appDays + offDays) : NaN   // 쓴 날 중 목표 달성일
     };
   }
 
@@ -522,7 +522,7 @@ var AdminView = (function () {
       '</div>' +
       card('사람별 기록', '<div class="ad-bar-r"><span class="ad-muted">이름 대신 익명 ID만 보여요. 기록에 없는 칸은 —로 표시해요.</span>' +
           '<button class="ad-btn sm sub" id="ad-csv">기록 CSV 내려받기</button></div>' +
-        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 다 채운 날', '지연 사용 전 → 후(분)', '가장 오래 안 쓴 기간', retLabel(rec.weeks), '알림'],
+        table(['ID', '쓴 날', '쬔 시간 합계(분)', c.stampMin + '분 이상 쬔 날', '목표 달성일', '지연 사용 전 → 후(분)', '가장 오래 안 쓴 기간', retLabel(rec.weeks), '알림'],
           appRows.concat(offRows)));
   }
 

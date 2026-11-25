@@ -44,7 +44,7 @@ function userDoc(over) {
   return Object.assign({
     updatedAt: serverTimestamp(),
     consentedAt: Timestamp.fromMillis(Date.UTC(2026, 10, 1)),
-    consentVersion: 'v2',
+    consentVersion: 'v3',
     notify: false,
     appVersion: 'v_2.2',
     skinType: 3,
