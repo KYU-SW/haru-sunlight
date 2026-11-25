@@ -208,7 +208,7 @@ var AdminView = (function () {
 
   function startDemo() {
     var d = AdminDemo.data();
-    state.mode = 'demo'; state.users = d.users; state.sessions = d.sessions; state.error = null;
+    state.mode = 'demo'; state.users = d.users; state.sessions = d.sessions; state.surveys = d.surveys || []; state.error = null;
     state.sessions.forEach(function (x) { x._id = sid(x); });
     state.log = []; state.sel = state.edit = state.merge = null;
     render();
@@ -352,48 +352,38 @@ var AdminView = (function () {
   }
 
   /* 못 쬔 이유 설문 (타이머 끝난 뒤 '지난주 돌아보기') — 가장 최근 주 이유별 응답 + 이유를 답한 다음 주 변화 */
-  function surveyTile() {
-    var NAME = { time: '시간', forgot: '깜빡', weather: '날씨', burn: '탈까 봐', lazy: '귀찮아서', none: '없음' };
-    /* 이유 답만 — 조치 확인 답(helped · nothelped)은 checkTile 에서 따로 센다 */
-    var list = (state.surveys || []).filter(function (s) { return NAME[s.answer]; });
-    if (!list.length || typeof Report === 'undefined') return null;
-    var week = list.map(function (s) { return s.week; }).sort().pop();
-    var c = {}, n = 0;
-    list.forEach(function (s) { if (s.week === week && NAME[s.answer]) { c[s.answer] = (c[s.answer] || 0) + 1; n++; } });
-    var top = Object.keys(c).sort(function (x, y) { return c[y] - c[x]; });
-    /* 답한 주(W) → 다음 주(W+7) 하루 목표 채운 비율 변화 — 두 주 모두 기록이 있는 사람만 */
-    var diffs = [];
-    list.forEach(function (s) {
-      if (!s.uid || s.answer === 'none') return;
-      var mine = (state.sessions || []).filter(function (x) { return x.uid === s.uid; });
-      var a = Report.mine(mine, { week: s.week, start: s.week, end: Report.addDays(s.week, 6) });
-      var nx = Report.addDays(s.week, 7);
-      var b = Report.mine(mine, { week: nx, start: nx, end: Report.addDays(nx, 6) });
-      if (a && b) diffs.push(b.goalRate - a.goalRate);
-    });
-    var avg = diffs.length ? Math.round(diffs.reduce(function (x, y) { return x + y; }, 0) / diffs.length) : null;
-    return { lab: '햇빛을 못 쬔 가장 큰 이유 (설문)',
-             val: top.length ? '<b>' + NAME[top[0]] + '</b> ' + Math.round(c[top[0]] / n * 100) + '%' : '—',
-             sub: week + ' 주 · 응답 ' + n + '명 · ' + top.map(function (k) { return NAME[k] + ' ' + c[k]; }).join(' · ') +
-                  (avg === null ? '' : ' · 답한 다음 주 목표 채운 비율 ' + (avg >= 0 ? '+' : '') + avg + '%p (' + diffs.length + '명)') };
+  /* ---------- 지난주 돌아보기 (개인화) — 사람별 ---------- */
+  var SV_NAME = { time: '시간이 없어서', forgot: '깜빡해서', weather: '날씨 탓', burn: '탈까 봐', lazy: '귀찮아서',
+                  none: '다 채웠어요', helped: '도움 됐어요', nothelped: '별로였어요' };
+  function surveysOf(uid) {
+    return (state.surveys || []).filter(function (x) { return x.uid === uid; })
+      .sort(function (a, b) { return a.week < b.week ? 1 : -1; });              // 최근 주부터
   }
-
-  /* 조치 확인 질문 — '도움 됐어요' 비율 (조치별) · core/adapt.js */
-  function checkTile() {
-    var list = (state.surveys || []).filter(function (s) { return s.answer === 'helped' || s.answer === 'nothelped'; });
-    if (!list.length || typeof Adapt === 'undefined') return null;
-    var by = {}, yes = 0;
-    list.forEach(function (s) {
-      var k = s.fix || '?';
-      by[k] = by[k] || [0, 0];
-      by[k][1]++;
-      if (s.answer === 'helped') { by[k][0]++; yes++; }
-    });
-    return { lab: '바꾼 조치가 도움 됐나요 (확인 질문)',
-             val: '<b>' + Math.round(yes / list.length * 100) + '%</b> 도움 됐어요',
-             sub: '응답 ' + list.length + '번 · ' + Object.keys(by).map(function (k) {
-               return (Adapt.NAME[k] || k) + ' ' + by[k][0] + '/' + by[k][1];
-             }).join(' · ') };
+  function fixName(k) { return k ? ((typeof Adapt !== 'undefined' && Adapt.NAME[k]) || k) : '—'; }
+  /* 명단 한 칸 — 가장 최근 답과 그때 켠 조치 */
+  function surveyBrief(uid) {
+    var l = surveysOf(uid);
+    if (!l.length) return '—';
+    return esc(SV_NAME[l[0].answer] || l[0].answer) + (l[0].fix ? ' → ' + esc(fixName(l[0].fix)) : '');
+  }
+  function personSurveyHtml(uid) {
+    var body;
+    if (state.surveys === null) {
+      body = '<p class="ad-muted">설문을 못 읽었어요 — Firestore 규칙에 surveys 가 없어요. 저장소 firestore.rules 를 콘솔에 다시 게시하면 응답이 모여요 (게시 전에는 앱에서 답해도 저장되지 않아요).</p>';
+    } else {
+      var l = surveysOf(uid), mine = sessionsOf(uid);
+      var rate = function (wk) {
+        var r = typeof Report !== 'undefined' ? Report.mine(mine, { week: wk, start: wk, end: Report.addDays(wk, 6) }) : null;
+        return r ? r.goalRate + '%' : '—';
+      };
+      body = l.length ? table(['주 (월요일)', '답', '켠 · 확인한 조치', '단계', '그 주 목표 채운 비율', '다음 주'],
+        l.map(function (x) {
+          var q = x.answer === 'helped' || x.answer === 'nothelped' ? '확인: ' : '이유: ';
+          return [x.week, q + esc(SV_NAME[x.answer] || x.answer), esc(fixName(x.fix)), x.fix ? (x.step || 0) + 1 + '단계' : '—',
+                  rate(x.week), rate(Report.addDays(x.week, 7))];
+        })) : '<p class="ad-muted">아직 응답이 없어요 — 타이머가 끝난 뒤 한 주에 한 번 팝업으로 받아요.</p>';
+    }
+    return card('지난주 돌아보기 (개인화)', '<p class="ad-muted">못 쬔 이유 → 켠 조치 → 다음 주 "도움이 됐나요?" → 유지 또는 다음 단계 (CALCULATION.md 11장). 목표 채운 비율은 하루 목표를 다 채운 날의 비율이에요.</p>' + body);
   }
 
   function summaryHtml(x) {
@@ -421,15 +411,6 @@ var AdminView = (function () {
       { lab: c.stampMin + '분 이상 쬔 날', val: '한 사람당 <b>' + fmt(S.mean(rec.stamps)) + '</b>일', sub: '앱에서 스탬프를 받은 날' + appOnly },
       { lab: '하루 목표를 채운 비율', val: '<b>' + pct(m.goalRate) + '</b>', sub: '타이머를 쓴 날 중 하루 목표의 ' + S.GOAL_PCT + '% 이상 쬔 날' + (off ? ' · 앱 기록의 하루 채운 양은 평균 ' : ' · 하루 채운 양은 평균 ') + fmt(rec.avgCharge, 0) + '%' }
     );
-    var sv = surveyTile();
-    if (sv) tiles.push(sv);
-    var ck = checkTile();
-    if (ck) tiles.push(ck);
-    /* 설문을 못 읽었거나 아직 응답이 없으면 칸을 숨기지 않고 이유를 보여 준다 */
-    if (!sv && !ck && state.mode === 'live') tiles.push(state.surveys === null
-      ? { lab: '지난주 돌아보기 설문 (개인화)', val: '<b>못 읽었어요</b>',
-          sub: 'Firestore 규칙에 surveys 가 없어요 — 저장소 firestore.rules 를 콘솔에 다시 게시하면 응답이 모이고 여기 보여요 (게시 전에는 앱에서 답해도 저장되지 않아요)' }
-      : { lab: '지난주 돌아보기 설문 (개인화)', val: '<b>0</b>번', sub: '아직 응답이 없어요 — 타이머가 끝난 뒤 한 주에 한 번 팝업으로 받아요' });
     return '<div class="ad-hd"><h2>한눈에 보기</h2><p class="ad-muted">' + periodText(rec, m) + '</p></div>' +
       '<div class="ad-tiles">' + tiles.map(function (t) {
         return '<div class="ad-tile"><span class="ad-lab">' + t.lab + '</span><div class="ad-big">' + t.val + '</div>' +
@@ -620,10 +601,10 @@ var AdminView = (function () {
       demoNote +
       card('참가자', '<div class="ad-bar-r"><span class="ad-muted">로그인이 안 되는 사람은 참가자를 새로 만들어 기록을 대신 넣을 수 있어요.</span>' +
           '<button class="ad-btn sm sub" id="mg-add-user">참가자 추가</button></div>' +
-        (list.length ? table(['ID', '타이머 기록', '쬔 시간 합계(분)', '마지막 기록', ''],
+        (list.length ? table(['ID', '타이머 기록', '쬔 시간 합계(분)', '마지막 기록', '개인화 (최근 답 → 조치)', ''],
           list.map(function (p) {
             return ['<code>' + esc(shortId(p.uid)) + '</code>' + (p.manual ? ' <span class="ad-chip">직접 추가</span>' : ''),
-              p.n + '번', fmt(p.min, 0), p.last || '—',
+              p.n + '번', fmt(p.min, 0), p.last || '—', surveyBrief(p.uid),
               '<div class="ad-acts">' +
                 '<button class="ad-link" data-sel="' + esc(p.uid) + '">' + (state.sel === p.uid ? '보는 중' : '기록 보기') + '</button>' +
                 '<button class="ad-link" data-merge="' + esc(p.uid) + '">합치기</button>' +
@@ -631,7 +612,7 @@ var AdminView = (function () {
               '</div>'];
           })) : empty())) +
       (state.merge ? mergeHtml(list) : '') +
-      (state.sel ? personHtml(state.sel) : '') +
+      (state.sel ? personHtml(state.sel) + personSurveyHtml(state.sel) : '') +
       logHtml();
   }
 

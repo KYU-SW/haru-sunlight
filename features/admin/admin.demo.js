@@ -44,7 +44,24 @@ var AdminDemo = (function () {
       if (r2() < 0.88) u.ageGroup = ages[Math.floor(r2() * ages.length)];
       if (r2() < 0.8) u.bmiGroup = bmis[Math.floor(r2() * bmis.length)];
     });
-    return { users: users, sessions: sessions, n: N, start: START, weeks: WEEKS };
+    /* 지난주 돌아보기 설문 — 사람별 개인화 화면 예시 (이유 → 조치 → 확인 → 다음 단계) */
+    var surveys = [], R = ['forgot', 'time', 'weather', 'burn', 'lazy'], L = { time: ['course12', 'split'], forgot: ['notify', 'notifyEarly'],
+      weather: ['outdoorLight', 'courseLight'], burn: ['burnNote', 'skinCheck'], lazy: ['course', 'split'] };
+    var r3 = rng(31);
+    users.forEach(function (u, i) {
+      if (r3() < 0.35) return;                               // 몇 명은 답하지 않음
+      var reason = R[i % R.length], step = 0;
+      for (var w = 1; w < WEEKS; w++) {                      // 첫 주는 비교할 지난주가 없다
+        var wk = AdminStats.keyOf(start + w * 7);
+        if (w % 2 === 1) surveys.push({ uid: u.uid, week: wk, answer: reason, fix: L[reason][step], step: step });
+        else {
+          var ok = r3() < 0.55;
+          surveys.push({ uid: u.uid, week: wk, answer: ok ? 'helped' : 'nothelped', fix: L[reason][step], step: step });
+          if (!ok && step < 1) step++;
+        }
+      }
+    });
+    return { users: users, sessions: sessions, surveys: surveys, n: N, start: START, weeks: WEEKS };
   }
 
   return { data: data };
