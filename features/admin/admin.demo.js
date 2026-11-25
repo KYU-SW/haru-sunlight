@@ -31,7 +31,7 @@ var AdminDemo = (function () {
           var min = Math.max(1, Math.round(6 + r() * 14 + d * 0.15));
           var pct = Math.min(300, Math.round(min * (4 + r() * 5)));
           sessions.push({
-            uid: uid, dateKey: AdminStats.keyOf(start + d), at: (start + d) * 86400000 + (11 + t * 3) * 3600000,
+            uid: uid, dateKey: AdminStats.keyOf(start + d), at: (start + d) * 86400000 + (11 + t * 3 - 9) * 3600000,   // 한국 시간 11시 · 14시 (dayNum 은 UTC 자정 기준)
             minutes: min, percent: pct, clothing: cloth[Math.floor(r() * 3)],
             limitedBy: r() < 0.8 ? 'vitd' : (r() < 0.6 ? 'burn' : 'heat')
           });

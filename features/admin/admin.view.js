@@ -361,6 +361,56 @@ var AdminView = (function () {
   }
   function fixName(k) { return k ? ((typeof Adapt !== 'undefined' && Adapt.NAME[k]) || k) : '—'; }
   /* 명단 한 칸 — 가장 최근 답과 그때 켠 조치 */
+  /* ---------- 사람별 패턴 (분석용 · 앱은 바뀌지 않는다) ---------- */
+  var WD = ['월', '화', '수', '목', '금', '토', '일'];
+  function wdOf(key) { return ((S.dayNum(key) % 7) + 10) % 7; }        // 1970-01-01 = 목요일 → 월 0 … 일 6
+  function personPatternHtml(uid) {
+    var list = sessionsOf(uid);
+    if (!list.length) return '';
+    /* ① 요일 — 첫 기록 ~ 마지막 기록 사이에서 요일마다 쓴 날 / 그 요일 수 */
+    var days = {}, first = Infinity, last = -Infinity;
+    list.forEach(function (x) { var d = S.dayNum(x.dateKey); days[d] = 1; if (d < first) first = d; if (d > last) last = d; });
+    var tot = [0, 0, 0, 0, 0, 0, 0], used = [0, 0, 0, 0, 0, 0, 0];
+    for (var d = first; d <= last; d++) { var w = wdOf(S.keyOf(d)); tot[w]++; if (days[d]) used[w]++; }
+    var rates = WD.map(function (n, i) { return tot[i] ? used[i] / tot[i] : null; });
+    var valid = rates.map(function (r, i) { return [r, i]; }).filter(function (x) { return x[0] !== null && tot[x[1]] >= 2; });
+    var low = valid.length > 2 ? valid.slice().sort(function (a, b) { return a[0] - b[0]; })[0] : null;
+    var wdRow = table(WD, [rates.map(function (r, i) {
+      return r === null ? '—' : (low && low[1] === i ? '<b>' + Math.round(r * 100) + '%</b>' : Math.round(r * 100) + '%') +
+        '<br><span class="ad-muted">' + used[i] + ' / ' + tot[i] + '일</span>';
+    })]);
+    /* ② 시간대 — 타이머를 켠 시각 */
+    var SLOT = [['아침', 0, 11], ['점심', 11, 14], ['오후', 14, 17], ['저녁', 17, 24]], cnt = [0, 0, 0, 0];
+    list.forEach(function (x) { var h = new Date(x.at).getHours(); SLOT.forEach(function (sl, i) { if (h >= sl[1] && h < sl[2]) cnt[i]++; }); });
+    var top = cnt.indexOf(Math.max.apply(null, cnt));
+    var slotRow = table(SLOT.map(function (sl) { return sl[0] + ' <span class="ad-muted">' + sl[1] + '~' + sl[2] + '시</span>'; }),
+      [cnt.map(function (c, i) { var t = c + '번 (' + Math.round(c / list.length * 100) + '%)'; return i === top ? '<b>' + t + '</b>' : t; })]);
+    /* ③ 같은 이유를 고른 다른 사람들에게 도움 됐던 조치 */
+    var mine = surveysOf(uid).filter(function (x) { return SV_NAME[x.answer] && x.answer !== 'helped' && x.answer !== 'nothelped' && x.answer !== 'none'; })[0];
+    var peer = '';
+    if (mine && state.surveys) {
+      var by = {};
+      state.surveys.forEach(function (x) {
+        if (x.uid === uid || (x.answer !== 'helped' && x.answer !== 'nothelped') || !x.fix) return;
+        var r = typeof Adapt !== 'undefined' ? Object.keys(Adapt.LADDER).filter(function (k) { return Adapt.LADDER[k].indexOf(x.fix) >= 0; }) : [];
+        if (r.indexOf(mine.answer) < 0) return;
+        by[x.fix] = by[x.fix] || [0, 0]; by[x.fix][1]++; if (x.answer === 'helped') by[x.fix][0]++;
+      });
+      var ks = Object.keys(by).sort(function (a, b) { return by[b][0] / by[b][1] - by[a][0] / by[a][1]; });
+      peer = ks.length ? table(['조치', '도움 됐어요', ''], ks.map(function (k) {
+          return [esc(fixName(k)), by[k][0] + ' / ' + by[k][1] + '번 (' + Math.round(by[k][0] / by[k][1] * 100) + '%)', mine.fix === k ? '<span class="ad-chip">지금 이 사람</span>' : ''];
+        })) : '<p class="ad-muted">같은 이유를 고른 다른 사람의 확인 답이 아직 없어요.</p>';
+      peer = '<h4 class="ad-sub-h">\'' + esc(SV_NAME[mine.answer]) + '\'를 고른 다른 사람들에게 도움 됐던 조치</h4>' + peer;
+    }
+    var note = [];
+    if (low) note.push('가장 자주 빠지는 요일: <b>' + WD[low[1]] + '요일</b> (' + Math.round(low[0] * 100) + '%)');
+    if (list.length) note.push('주로 쬐는 시간대: <b>' + SLOT[top][0] + '</b>');
+    return card('사람별 패턴 (분석용)',
+      '<p class="ad-muted">' + (note.join(' · ') || '기록이 더 쌓이면 보여요') + ' · 날씨는 타이머 기록에 저장되지 않아 패턴으로 보지 않아요</p>' +
+      '<h4 class="ad-sub-h">요일별 — 쓴 날 비율 (' + S.keyOf(first) + ' ~ ' + S.keyOf(last) + ')</h4>' + wdRow +
+      '<h4 class="ad-sub-h">시간대별 — 타이머를 켠 시각</h4>' + slotRow + peer);
+  }
+
   function surveyBrief(uid) {
     var l = surveysOf(uid);
     if (!l.length) return '—';
@@ -612,7 +662,7 @@ var AdminView = (function () {
               '</div>'];
           })) : empty())) +
       (state.merge ? mergeHtml(list) : '') +
-      (state.sel ? personHtml(state.sel) + personSurveyHtml(state.sel) : '') +
+      (state.sel ? personHtml(state.sel) + personSurveyHtml(state.sel) + personPatternHtml(state.sel) : '') +
       logHtml();
   }
 

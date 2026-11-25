@@ -144,3 +144,6 @@ code { font-family:ui-monospace, Menlo, monospace; font-size:.9em; }
   .ad-top-r .ad-muted { display:none; }
 }
 @media (prefers-reduced-motion: reduce) { .ad-toast { transition:none; } }
+
+/* 기록 관리 › 사람별 패턴 — 표 위 작은 제목 */
+.ad-sub-h { margin:18px 0 6px; font-size:13px; font-weight:700; color:#131A2B; }
